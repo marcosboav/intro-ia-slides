@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Introdução à Inteligência Artificial</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #08080f;
+      --surface:  #111120;
+      --surface2: #17172a;
+      --border:   rgba(255,255,255,0.07);
+      --text:     #eeeeff;
+      --muted:    rgba(238,238,255,0.45);
+      --accent:   #6e56cf;
+      --accent2:  #9e8cfc;
+      --accent3:  #c4b5fd;
+      --green:    #4ade80;
+      --orange:   #fb923c;
+      --red:      #f87171;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── ambient glows ─── */
+    .glow {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    }
+    .glow::before {
+      content: '';
+      position: absolute; top: -15%; left: -10%;
+      width: 55%; height: 55%;
+      background: radial-gradient(ellipse, rgba(110,86,207,.10) 0%, transparent 70%);
+    }
+    .glow::after {
+      content: '';
+      position: absolute; bottom: -15%; right: -5%;
+      width: 45%; height: 45%;
+      background: radial-gradient(ellipse, rgba(158,140,252,.07) 0%, transparent 70%);
+    }
+
+    /* ─── progress bar ─── */
+    #progress {
+      position: fixed; top: 0; left: 0; height: 2px; width: 0;
+      background: linear-gradient(90deg, var(--accent), var(--accent3));
+      transition: width .35s ease;
+      z-index: 300;
+    }
+
+    /* ─── block indicator ─── */
+    #blocks {
+      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 6px;
+      z-index: 200;
+    }
+    .bpip {
+      height: 3px; border-radius: 2px;
+      background: var(--border);
+      transition: background .3s, width .3s;
+    }
+    .bpip.on { background: var(--accent2); }
+
+    /* ─── nav ─── */
+    #nav {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(17,17,32,.85); backdrop-filter: blur(14px);
+      border: 1px solid var(--border); border-radius: 40px;
+      padding: 7px 14px;
+      z-index: 200;
+    }
+    .nbtn {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s;
+    }
+    .nbtn:hover { background: rgba(110,86,207,.18); border-color: rgba(110,86,207,.5); color: var(--text); }
+    .nbtn:disabled { opacity: .3; cursor: default; }
+    #counter { font-size: 12px; color: var(--muted); font-weight: 500; min-width: 52px; text-align: center; }
+
+    /* ─── slides container ─── */
+    #deck { position: relative; width: 100vw; height: 100vh; z-index: 1; }
+
+    /* ─── individual slide ─── */
+    .slide {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: flex-start;
+      padding: 80px 10vw;
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity .4s ease, transform .4s ease;
+      pointer-events: none;
+    }
+    .slide.active { opacity: 1; transform: translateY(0); pointer-events: all; }
+    .slide.exit   { opacity: 0; transform: translateY(-18px); }
+    .slide.center { align-items: center; text-align: center; }
+
+    /* ─── type scale ─── */
+    .eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--accent2);
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 18px;
+    }
+    .eyebrow::before {
+      content: ''; display: block; width: 18px; height: 1px; background: var(--accent2); flex-shrink: 0;
+    }
+    .slide.center .eyebrow { justify-content: center; }
+    .slide.center .eyebrow::before { display: none; }
+
+    h1 {
+      font-size: clamp(46px, 7.5vw, 88px);
+      font-weight: 800; line-height: 1.02; letter-spacing: -.035em;
+      background: linear-gradient(140deg, #fff 0%, var(--accent3) 55%, var(--accent) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    h2 {
+      font-size: clamp(28px, 4vw, 52px);
+      font-weight: 700; line-height: 1.1; letter-spacing: -.025em;
+    }
+    .lead {
+      font-size: clamp(17px, 2.2vw, 26px);
+      font-weight: 300; line-height: 1.55; color: rgba(238,238,255,.8);
+      max-width: 640px; margin-top: 20px;
+    }
+    p {
+      font-size: clamp(14px, 1.6vw, 18px);
+      line-height: 1.7; color: rgba(238,238,255,.7);
+      max-width: 680px;
+    }
+    p strong { color: var(--text); font-weight: 600; }
+    p + p { margin-top: 14px; }
+
+    /* ─── spacer util ─── */
+    .sp { display: block; }
+
+    /* ─── quote ─── */
+    .quote {
+      border-left: 2px solid var(--accent);
+      padding-left: 24px;
+      font-size: clamp(19px, 2.4vw, 28px);
+      font-style: italic;
+      color: rgba(238,238,255,.85);
+      line-height: 1.55;
+      max-width: 760px;
+    }
+
+    /* ─── highlight box ─── */
+    .hl {
+      background: rgba(110,86,207,.1);
+      border: 1px solid rgba(110,86,207,.28);
+      border-radius: 10px;
+      padding: 16px 20px;
+      font-size: clamp(13px, 1.5vw, 16px);
+      color: var(--accent3);
+      line-height: 1.6;
+      max-width: 700px;
+    }
+    .hl strong { color: #fff; }
+
+    /* ─── card ─── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+    }
+    .card.ac { border-color: rgba(110,86,207,.3); background: rgba(110,86,207,.08); }
+    .card p { max-width: none; }
+
+    /* ─── debate card ─── */
+    .debate {
+      background: rgba(251,146,60,.07);
+      border: 1px solid rgba(251,146,60,.25);
+      border-radius: 14px;
+      padding: 32px 36px;
+      max-width: 740px;
+      font-size: clamp(15px, 1.9vw, 21px);
+      line-height: 1.7;
+      color: rgba(238,238,255,.88);
+    }
+    .debate strong { color: var(--orange); }
+
+    /* ─── list ─── */
+    .list { display: flex; flex-direction: column; gap: 14px; max-width: 720px; }
+    .li {
+      display: flex; align-items: flex-start; gap: 14px;
+      font-size: clamp(14px, 1.6vw, 18px); color: rgba(238,238,255,.78); line-height: 1.55;
+    }
+    .dot {
+      flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent2); margin-top: 8px;
+    }
+    .dot.g { background: var(--green); }
+    .dot.o { background: var(--orange); }
+    .li strong { color: var(--text); }
+
+    /* ─── grid helpers ─── */
+    .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; max-width: 860px; }
+    .g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; max-width: 860px; }
+    .g2 .card p, .g3 .card p { font-size: 14px; color: var(--muted); max-width: none; }
+    .g2 .card strong, .g3 .card strong { color: var(--text); }
+
+    /* ─── stat ─── */
+    .stat { text-align: center; }
+    .sn {
+      font-size: clamp(34px, 5vw, 58px); font-weight: 800; letter-spacing: -.03em;
+      background: linear-gradient(135deg, var(--accent3), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      line-height: 1;
+    }
+    .sl { font-size: 12px; color: var(--muted); font-weight: 500; margin-top: 6px; line-height: 1.4; }
+
+    /* ─── company cards ─── */
+    .cc { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; }
+    .cc h4 { font-size: 15px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .cc p { font-size: 13px; color: var(--muted); max-width: none; line-height: 1.55; }
+    .cc p strong { color: var(--text); }
+    .cc.pur { border-color: rgba(110,86,207,.35); }
+    .cc.grn { border-color: rgba(74,222,128,.3); }
+    .cc.org { border-color: rgba(251,146,60,.3); }
+
+    /* ─── orange stat variant ─── */
+    .sn.org {
+      background: linear-gradient(135deg, #fff, var(--orange));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    @media (max-width: 700px) {
+      .slide { padding: 60px 6vw; }
+      .g2, .g3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="glow"></div>
+<div id="progress"></div>
+
+<!-- block pips -->
+<div id="blocks">
+  <div class="bpip on" style="width:32px" data-b="0"></div>
+  <div class="bpip"    style="width:72px" data-b="1"></div>
+  <div class="bpip"    style="width:72px" data-b="2"></div>
+  <div class="bpip"    style="width:72px" data-b="3"></div>
+</div>
+
+<div id="deck">
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 01 · COVER
+  ══════════════════════════════════════════ -->
+  <div class="slide center active" data-b="0">
+    <div class="eyebrow">Introdução à IA · Março 2026</div>
+    <h1>Introdução à<br>Inteligência<br>Artificial</h1>
+    <p class="lead" style="text-align:center;">Não para saber usar.<br>Para saber pensar.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 02 · ANTES DE COMEÇAR
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="0">
+    <div class="eyebrow">Antes de começar</div>
+    <div class="quote">
+      Esta aula não é um tutorial de ferramentas.<br>
+      Ferramentas mudam de três em três meses.
+    </div>
+    <p class="lead" style="text-align:center; margin-top:24px;">
+      O que não muda é a forma como estes sistemas funcionam,<br>
+      os seus limites reais, e o que significa integrá-los<br>
+      numa profissão criativa.
+    </p>
+    <div class="hl" style="margin-top:28px; text-align:center;">
+      O objetivo não é saíres daqui a saber usar a IA.<br>
+      É saíres a saber <strong>pensar sobre ela.</strong>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 03 · BLOCO 1 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="1">
+    <div class="eyebrow">Bloco 1 · 45 minutos</div>
+    <h1>O que é isto,<br>afinal?</h1>
+    <p class="lead" style="text-align:center;">Da perceção errada ao mecanismo real.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 04 · O GAP
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">O ponto de partida honesto</div>
+    <h2>O gap que este bloco fecha.</h2>
+    <div class="sp" style="height:28px"></div>
+    <div class="g2" style="max-width:760px;">
+      <div class="card" style="text-align:center;">
+        <div class="sn" style="font-size:40px; margin-bottom:8px;">✋</div>
+        <p>Quantos usaram IA esta semana?</p>
+      </div>
+      <div class="card ac" style="text-align:center;">
+        <div style="font-size:36px; margin-bottom:8px;">🤷</div>
+        <p>Quantos conseguem explicar o que acontece quando carregam no enter?</p>
+      </div>
+    </div>
+    <div class="hl" style="margin-top:24px;">
+      É esse o gap que este bloco fecha.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 05 · IA COMO CAMADA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Diferença estrutural</div>
+    <h2>Não é um destino.<br>É uma camada.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="list">
+      <div class="li"><span class="dot"></span><span>NFTs, Metaverso, Web3 eram <strong>destinos</strong> — era preciso convencer as pessoas a ir até lá</span></div>
+      <div class="li"><span class="dot"></span><span>A IA instala-se <strong>por baixo de onde já estamos</strong></span></div>
+      <div class="li"><span class="dot"></span><span>O teu cliente não sabe que o chatbot do banco usa IA. Não precisa de saber.</span></div>
+      <div class="li"><span class="dot"></span><span>Não depende de adesão consciente — por isso não vai esfriar como as outras.</span></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 06 · IA QUE JÁ EXISTE
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">A IA que já existe há uma década</div>
+    <h2>Não nasceu em<br>novembro de 2022.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="g2">
+      <div class="card"><p><strong>TikTok</strong> — decide o próximo vídeo que vês</p></div>
+      <div class="card"><p><strong>Google Maps</strong> — recalcula em tempo real com milhões de telemóveis</p></div>
+      <div class="card"><p><strong>Amazon</strong> — cross-selling preditivo</p></div>
+      <div class="card"><p><strong>Netflix</strong> — sabe que vais gostar antes de saberes</p></div>
+      <div class="card" style="grid-column:1/-1"><p><strong>Filtro de spam</strong> — limpa a caixa de entrada sem que penses nele</p></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 07 · ANI
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Terminologia</div>
+    <h2>ANI — Artificial<br>Narrow Intelligence</h2>
+    <div class="sp" style="height:22px"></div>
+    <p>Estreita e invisível. Faz uma coisa só, faz muito bem, e não a vês a trabalhar.</p>
+    <div class="hl" style="margin-top:20px;">
+      O algoritmo do TikTok é um génio absoluto a prever o que te mantém no ecrã mais 30 segundos — e seria completamente inútil a escrever um email.
+    </div>
+    <div class="sp" style="height:20px"></div>
+    <p>O que mudou em 2022 não foi a existência da IA.<br>Foi a sua <strong>acessibilidade.</strong></p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 08 · 2017 ATTENTION IS ALL YOU NEED
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">2017 · O paper que ninguém leu</div>
+    <h2>"Attention Is All You Need"</h2>
+    <p style="margin-top:14px;">Um grupo de investigadores da Google publicou um artigo que ficou nos círculos académicos — e mudou tudo.</p>
+    <div class="sp" style="height:22px"></div>
+    <div class="g2" style="max-width:800px;">
+      <div class="card">
+        <p style="font-size:12px; color:var(--muted); margin-bottom:10px;">Antes dos Transformers</p>
+        <p><strong>Memória de peixe.</strong> Modelos liam palavra a palavra e esqueciam o início de frases longas.</p>
+      </div>
+      <div class="card ac">
+        <p style="font-size:12px; color:var(--accent2); margin-bottom:10px;">Mecanismo de Atenção</p>
+        <p>O modelo lê a frase inteira de uma vez e aprende a <strong>relacionar palavras distantes</strong> entre si.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 09 · TRANSFORMERS
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Transformers</div>
+    <h2>Cumpre instruções<br>vs. interpreta intenção.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="g2" style="max-width:780px;">
+      <div class="card">
+        <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Modelos anteriores</p>
+        <p>Lê o brief à procura de palavras-chave</p>
+      </div>
+      <div class="card ac">
+        <p style="font-size:12px; color:var(--accent2); margin-bottom:8px;">Transformers</p>
+        <p>Lê o brief para perceber o que <strong>pretendes</strong></p>
+      </div>
+    </div>
+    <div class="sp" style="height:22px"></div>
+    <div class="hl">
+      <strong>GPT</strong> = Generative Pre-trained <strong>Transformer</strong> — o T é precisamente este.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 10 · NOVEMBRO 2022
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Novembro 2022</div>
+    <h2>A interface que<br>democratizou tudo.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="g3" style="text-align:center;">
+      <div class="card">
+        <div class="sn" style="margin-bottom:6px;">5</div>
+        <div class="sl">dias para 1M utilizadores<br><span style="color:var(--accent2);">ChatGPT</span></div>
+      </div>
+      <div class="card">
+        <div class="sn" style="margin-bottom:6px;">2,5</div>
+        <div class="sl">meses<br>Instagram</div>
+      </div>
+      <div class="card">
+        <div class="sn" style="margin-bottom:6px;">3,5</div>
+        <div class="sl">anos<br>Netflix</div>
+      </div>
+    </div>
+    <p style="margin-top:22px;">A OpenAI pegou num modelo complexo e pôs-lhe uma caixa de texto. Só isso — uma interface de conversa que tornava desnecessário saber programar.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 11 · O QUE É UM LLM
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Large Language Model</div>
+    <h2>O autocomplete que leu<br>a internet inteira.</h2>
+    <div class="sp" style="height:20px"></div>
+    <p>A cada palavra que gera, calcula: <em>dada tudo o que li e dado o contexto desta conversa, qual é a próxima palavra mais provável?</em></p>
+    <div class="sp" style="height:18px"></div>
+    <div class="list">
+      <div class="li"><span class="dot"></span><span>Não pensa. Não tem opiniões.</span></div>
+      <div class="li"><span class="dot"></span><span>Não compreende o mundo da forma como nós compreendemos.</span></div>
+      <div class="li"><span class="dot"></span><span>É o autocomplete do telemóvel — mas que leu a Wikipedia inteira, grande parte da web, e uma quantidade de livros que levaria séculos a ler a um humano.</span></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 12 · ALUCINAÇÕES
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">O fenómeno das alucinações</div>
+    <h2>Não é um bug.<br>É a outra face da criatividade.</h2>
+    <div class="sp" style="height:20px"></div>
+    <p>Não vai à Wikipedia confirmar. Está a calcular probabilidades. Não há verificação — há <strong>predição.</strong></p>
+    <div class="sp" style="height:16px"></div>
+    <div class="card ac" style="max-width:700px;">
+      <p>Se retirares a capacidade de "inventar", transformas o modelo numa base de dados. Perde a capacidade de escrever um poema ou inventar um conceito de campanha.</p>
+      <p style="margin-top:10px;"><strong>A criatividade e a alucinação são dois lados da mesma moeda.</strong></p>
+    </div>
+    <div class="hl" style="margin-top:18px;">
+      Regra prática: usa a IA para <strong>criar</strong>, nunca para <strong>verificar factos</strong> que importam.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 13 · TOKENS
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Tokens</div>
+    <h2>O custo invisível de<br>trabalhar em português.</h2>
+    <div class="sp" style="height:22px"></div>
+    <p>A IA não lê palavras. Lê pedaços de palavras chamados <strong>tokens</strong>. Os modelos foram treinados maioritariamente em inglês — palavras portuguesas ficam fragmentadas.</p>
+    <div class="sp" style="height:20px"></div>
+    <div class="g2" style="max-width:780px; text-align:center;">
+      <div class="card">
+        <div class="sn" style="margin-bottom:6px;">1–2</div>
+        <div class="sl">tokens por palavra<br>em inglês</div>
+      </div>
+      <div class="card" style="border-color:rgba(251,146,60,.3);">
+        <div class="sn org" style="margin-bottom:6px;">+30–60%</div>
+        <div class="sl">mais tokens por texto<br>equivalente em português</div>
+      </div>
+    </div>
+    <p style="margin-top:18px; font-size:13px; color:var(--muted);">Demo ao vivo → platform.openai.com/tokenizer</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 14 · CONTEXT WINDOW
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Context Window</div>
+    <h2>A memória que a IA<br>tem de ti.</h2>
+    <div class="sp" style="height:20px"></div>
+    <p>Quando o contexto excede o limite, a IA não dá erro — simplesmente <strong>esquece</strong> o que ficou fora da janela. É como falar com alguém que só se lembra dos últimos vinte minutos.</p>
+    <div class="sp" style="height:20px"></div>
+    <div class="g3" style="text-align:center;">
+      <div class="card">
+        <div class="sn" style="font-size:32px; margin-bottom:6px;">1M</div>
+        <div class="sl">tokens<br>GPT-5.4 / Claude Opus</div>
+      </div>
+      <div class="card ac">
+        <div class="sn" style="font-size:32px; margin-bottom:6px;">10M</div>
+        <div class="sl">tokens<br>Llama 4 Scout</div>
+      </div>
+      <div class="card">
+        <div class="sn" style="font-size:32px; margin-bottom:6px;">0</div>
+        <div class="sl">memória<br>entre sessões</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 15 · ANI AGI ASI
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Onde estamos no mapa</div>
+    <h2>ANI · AGI · ASI</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="list">
+      <div class="li"><span class="dot g"></span><span><strong style="color:var(--green);">ANI</strong> — Narrow Intelligence. Onde estamos. GPT, Claude, Gemini. Competentes, mas sem compreensão real do mundo.</span></div>
+      <div class="li"><span class="dot"></span><span><strong style="color:var(--accent2);">AGI</strong> — General Intelligence. Iguala o humano em qualquer tarefa cognitiva. Não existe. 5 anos? 50 anos? Ninguém sabe.</span></div>
+      <div class="li"><span class="dot o"></span><span><strong style="color:var(--orange);">ASI</strong> — Superintelligence. O passo a seguir à AGI. Território especulativo.</span></div>
+    </div>
+    <div class="hl" style="margin-top:24px;">
+      Conhecer os limites é o que te separa do utilizador ingénuo do utilizador estratégico.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 16 · BLOCO 2 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="2">
+    <div class="eyebrow">Bloco 2 · 45 minutos</div>
+    <h1>De onde vem e<br>o que custa.</h1>
+    <p class="lead" style="text-align:center;">O processo de treino. Os dados. O impacto.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 17 · 3 FASES DE TREINO
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">Como se faz uma IA</div>
+    <h2>Três fases de treino.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="list">
+      <div class="li"><span class="dot"></span><span><strong>Pré-treino</strong> — A máquina lê tudo. Web, livros, artigos, código, fóruns. Aprende padrões de linguagem — não a responder perguntas.</span></div>
+      <div class="li"><span class="dot"></span><span><strong>Fine-tuning</strong> — Treino com exemplos de perguntas e respostas. O "rato de biblioteca" aprende a comportar-se como assistente.</span></div>
+      <div class="li"><span class="dot"></span><span><strong>Alinhamento (RLHF)</strong> — Humanos avaliam respostas. O modelo aprende boas maneiras — incluindo recusar pedidos perigosos. E aqui entram as escolhas políticas e culturais das empresas.</span></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 18 · OS DADOS
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">De onde vieram os dados</div>
+    <h2>A questão que não vai<br>desaparecer.</h2>
+    <div class="sp" style="height:20px"></div>
+    <p>Web scraping em larga escala. Artigos, livros, conversas, letras de músicas, guiões — muitas vezes <strong>sem consentimento</strong> explícito dos autores.</p>
+    <div class="sp" style="height:16px"></div>
+    <div class="card" style="max-width:700px; border-color:rgba(251,146,60,.25);">
+      <p>O New York Times processou a OpenAI por reprodução quase literal de artigos. Ilustradores descobriram que IAs podiam replicar o seu estilo exato — porque foi absorvido sem autorização e sem compensação.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 19 · DEBATE COPYRIGHT
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="2">
+    <div class="eyebrow">Debate · 10 minutos</div>
+    <div class="debate">
+      Se um redator criativo passa anos a absorver referências e constrói o seu vocabulário narrativo, chamamos-lhe <strong>experiência</strong>.<br><br>
+      Se uma máquina faz o mesmo processo com cem milhões de peças, chamamos-lhe <strong>roubo</strong>?
+    </div>
+    <p style="margin-top:22px; max-width:640px; text-align:center;">Não há resposta certa. Mas o que o mercado e os tribunais vão decidir nos próximos anos vai redefinir o que significa autoria no século XXI.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 20 · A SEDE DA NUVEM
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">A sede da nuvem</div>
+    <h2>A IA tem peso físico.</h2>
+    <div class="sp" style="height:20px"></div>
+    <p>Cada prompt vai até servidores físicos — GPUs a funcionar no máximo. Esse calor tem de ir para algum lado: torres de arrefecimento a água. Não é metáfora. É física.</p>
+    <div class="sp" style="height:20px"></div>
+    <div class="g2" style="max-width:800px; text-align:center;">
+      <div class="card">
+        <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Big Tech (Google, OpenAI)</p>
+        <div class="sn" style="margin-bottom:6px;">5</div>
+        <div class="sl">gotas por query<br>(0,26 ml)</div>
+      </div>
+      <div class="card" style="border-color:rgba(251,146,60,.3);">
+        <p style="font-size:12px; color:var(--orange); margin-bottom:8px;">Investigadores UC + Washington Post</p>
+        <div class="sn org" style="margin-bottom:6px;">519ml</div>
+        <div class="sl">por email de 100 palavras<br>gerado com GPT-4</div>
+      </div>
+    </div>
+    <p style="margin-top:16px; font-size:13px; color:var(--muted);">Não é erro de medição. É uma escolha de contabilidade — o que se decide incluir na equação.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 21 · NÚMEROS ÁGUA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">Impacto ambiental</div>
+    <h2>Os números que<br>vale a pena saber.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="list">
+      <div class="li"><span class="dot o"></span><span>Quase <strong>metade dos data centers do mundo</strong> está em zonas de stress hídrico</span></div>
+      <div class="li"><span class="dot o"></span><span>A Amazon pediu em Espanha um aumento de <strong>48%</strong> nos seus direitos de extração de água</span></div>
+      <div class="li"><span class="dot o"></span><span>Morgan Stanley projeta <strong>mais de 1 bilião de litros por ano</strong> até 2028 — 11× o consumo de 2024</span></div>
+    </div>
+    <div class="hl" style="margin-top:24px;">
+      Para quem trabalha em narrativas de sustentabilidade e ESG: a pergunta não é <em>se</em> a tua marca usa IA. É o que fazes com isso <strong>quando alguém perguntar.</strong>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 22 · BLOCO 3 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="3">
+    <div class="eyebrow">Bloco 3 · 45 minutos</div>
+    <h1>O mercado em<br>Março de 2026.</h1>
+    <p class="lead" style="text-align:center;">Quatro jogadores. Quatro apostas diferentes.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 23 · A GUERRA MUDOU
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">Estado da competição</div>
+    <h2>A guerra da IA deixou de ser<br>sobre quem escreve melhor.</h2>
+    <div class="sp" style="height:20px"></div>
+    <p>Isso está essencialmente resolvido — todos os modelos de topo escrevem bem.</p>
+    <div class="hl" style="margin-top:20px;">
+      A corrida agora é outra: quem <strong>age melhor</strong>. Quem completa tarefas autónomas de forma fiável. Quem <strong>raciocina</strong> em vez de apenas gerar.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 24 · OS QUATRO JOGADORES
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">Os quatro jogadores</div>
+    <h2>Quatro apostas diferentes.</h2>
+    <div class="sp" style="height:22px"></div>
+    <div class="g2" style="max-width:920px;">
+      <div class="cc">
+        <h4>OpenAI · GPT-5.4</h4>
+        <p>83% das tarefas avaliadas. 33% menos erros factuais. Foco em <strong>agentes autónomos</strong> — sistemas que operam software e completam workflows longos.</p>
+      </div>
+      <div class="cc pur">
+        <h4>Anthropic · Claude 4.6</h4>
+        <p>14,5h de execução autónoma. O maior horizonte de qualquer modelo. Recusou exigências do governo americano para vigilância em massa e armas autónomas.</p>
+      </div>
+      <div class="cc">
+        <h4>Google · Gemini 3.1 Pro</h4>
+        <p>A vantagem é a <strong>integração</strong> — Gmail, Docs, Sheets, Android. Multimodal nativo: texto, imagem, áudio, vídeo, PDF ao mesmo tempo.</p>
+      </div>
+      <div class="cc grn">
+        <h4>Meta · Llama 4</h4>
+        <p><strong>Open-weight.</strong> Podes instalar nos teus servidores. Nenhum dado sai da empresa. 10 milhões de tokens de contexto no Scout.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 25 · DEEPSEEK
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">Janeiro 2025 · DeepSeek</div>
+    <h2>O milagre da eficiência.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="card" style="max-width:700px; border-color:rgba(251,146,60,.3);">
+      <p>As ações da Nvidia caíram <strong>17%</strong> num único dia — a maior perda de valor de mercado de uma empresa em bolsa da história.</p>
+    </div>
+    <div class="sp" style="height:18px"></div>
+    <p>O DeepSeek provava que não precisas de um supercomputador de mil milhões de dólares para fazer IA de topo.</p>
+    <div class="hl" style="margin-top:18px;">
+      <strong>Destilação:</strong> em vez de treinar do zero, um modelo pequeno aprende os atalhos de raciocínio de um modelo grande. Aprende o <em>processo de pensar</em> — não só as respostas certas.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 26 · OPEN VS CLOSED DEBATE
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="3">
+    <div class="eyebrow">Debate · 10 minutos</div>
+    <div class="debate" style="text-align:left;">
+      A tua agência tem acesso ao briefing do cliente, dados de consumidores, estratégias confidenciais.<br><br>
+      Cada vez que usas o ChatGPT para trabalhar esses dados, estás a enviá-los para servidores da OpenAI. Leste os termos de serviço?<br><br>
+      <strong>Alternativa:</strong> descarregas o Llama 4, instalas nos servidores da empresa, nenhum dado sai. Zero.
+    </div>
+    <p style="margin-top:22px; max-width:640px; text-align:center;">Não há resposta certa universal. Há uma resposta certa para cada <strong>contexto.</strong></p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 27 · HUGGING FACE
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">Infraestrutura</div>
+    <h2>Hugging Face —<br>o grossista da IA.</h2>
+    <div class="sp" style="height:22px"></div>
+    <div class="g2" style="max-width:780px; text-align:center;">
+      <div class="card">
+        <div class="sn" style="margin-bottom:6px;">500k+</div>
+        <div class="sl">modelos disponíveis<br>gratuitamente</div>
+      </div>
+      <div class="card ac" style="text-align:center;">
+        <div class="sn" style="font-size:40px; margin-bottom:6px;">∞</div>
+        <div class="sl">de LLMs a modelos de imagem,<br>som, vídeo, classificação</div>
+      </div>
+    </div>
+    <div class="sp" style="height:18px"></div>
+    <p>A IA deixou de ser um site de chat e tornou-se uma <strong>infraestrutura</strong>. Como o Linux. Como o MySQL. Algo que está por baixo de aplicações que usas sem saberes que está lá.</p>
+    <p style="margin-top:10px; font-size:13px; color:var(--muted);">Demo ao vivo → huggingface.co</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 28 · A PERGUNTA CERTA
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="3">
+    <div class="eyebrow">Para terminar</div>
+    <h2 style="max-width:680px; font-size:clamp(26px,3.8vw,46px);">
+      A pergunta errada é<br>"devo usar IA?"
+    </h2>
+    <div class="hl" style="margin-top:26px; text-align:center; font-size:clamp(15px,1.9vw,19px); max-width:680px;">
+      Que IA, para que tarefa, com que dados,<br>com que salvaguardas, e com que impacto na qualidade do trabalho<br>e nos valores que representas como profissional?
+    </div>
+    <div class="sp" style="height:24px"></div>
+    <p style="text-align:center; max-width:600px;">
+      Quem souber responder bem a essa pergunta nos próximos dois anos<br>
+      não vai apenas sobreviver à mudança.<br>
+      <strong>Vai estar a defini-la.</strong>
+    </p>
+  </div>
+
+</div><!-- /#deck -->
+
+<!-- nav bar -->
+<nav id="nav">
+  <button class="nbtn" id="btnPrev" onclick="go(-1)" title="← Anterior">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+      <path d="M8.5 10.5L4.5 6.5L8.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <span id="counter">1 / 28</span>
+  <button class="nbtn" id="btnNext" onclick="go(1)" title="→ Seguinte">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+      <path d="M4.5 2.5L8.5 6.5L4.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</nav>
+
+<script>
+  const slides  = Array.from(document.querySelectorAll('#deck .slide'));
+  const total   = slides.length;
+  let   cur     = 0;
+  let   animating = false;
+
+  function goTo(n) {
+    if (animating || n === cur) return;
+    n = Math.max(0, Math.min(n, total - 1));
+
+    animating = true;
+    slides[cur].classList.add('exit');
+    slides[cur].classList.remove('active');
+
+    const prev = cur;
+    cur = n;
+
+    slides[cur].classList.add('active');
+    slides[cur].classList.remove('exit');
+
+    setTimeout(() => {
+      slides[prev].classList.remove('exit');
+      animating = false;
+    }, 420);
+
+    // counter
+    document.getElementById('counter').textContent = `${cur + 1} / ${total}`;
+
+    // progress bar
+    document.getElementById('progress').style.width =
+      `${((cur + 1) / total) * 100}%`;
+
+    // block pips
+    const b = slides[cur].dataset.b;
+    document.querySelectorAll('.bpip').forEach(p =>
+      p.classList.toggle('on', p.dataset.b === b)
+    );
+
+    // button states
+    document.getElementById('btnPrev').disabled = cur === 0;
+    document.getElementById('btnNext').disabled = cur === total - 1;
+  }
+
+  function go(dir) { goTo(cur + dir); }
+
+  // keyboard
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown',' '].includes(e.key)) { e.preventDefault(); go(1); }
+    if (['ArrowLeft','ArrowUp'].includes(e.key))        { e.preventDefault(); go(-1); }
+  });
+
+  // touch / swipe
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend',   e => {
+    const d = tx - e.changedTouches[0].clientX;
+    if (Math.abs(d) > 48) go(d > 0 ? 1 : -1);
+  });
+
+  // click on slide to advance (not on nav)
+  document.getElementById('deck').addEventListener('click', e => {
+    if (!e.target.closest('#nav')) go(1);
+  });
+
+  // init
+  goTo(0);
+  document.getElementById('btnPrev').disabled = true;
+</script>
+</body>
+</html>
