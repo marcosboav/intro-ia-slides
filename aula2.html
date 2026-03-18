@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IA Aplicada ao Marketing · Aula 2 · Março 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #08080f;
+      --surface:  #111120;
+      --surface2: #17172a;
+      --border:   rgba(255,255,255,0.07);
+      --text:     #eeeeff;
+      --muted:    rgba(238,238,255,0.45);
+      --accent:   #6e56cf;
+      --accent2:  #9e8cfc;
+      --accent3:  #c4b5fd;
+      --green:    #4ade80;
+      --orange:   #fb923c;
+      --red:      #f87171;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── ambient glows ─── */
+    .glow { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+    .glow::before {
+      content: ''; position: absolute; top: -15%; left: -10%;
+      width: 55%; height: 55%;
+      background: radial-gradient(ellipse, rgba(110,86,207,.10) 0%, transparent 70%);
+    }
+    .glow::after {
+      content: ''; position: absolute; bottom: -15%; right: -5%;
+      width: 45%; height: 45%;
+      background: radial-gradient(ellipse, rgba(158,140,252,.07) 0%, transparent 70%);
+    }
+
+    /* ─── progress bar ─── */
+    #progress {
+      position: fixed; top: 0; left: 0; height: 2px; width: 0;
+      background: linear-gradient(90deg, var(--accent), var(--accent3));
+      transition: width .35s ease; z-index: 300;
+    }
+
+    /* ─── block indicator ─── */
+    #blocks {
+      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 6px; z-index: 200;
+    }
+    .bpip { height: 3px; border-radius: 2px; background: var(--border); transition: background .3s, width .3s; }
+    .bpip.on { background: var(--accent2); }
+
+    /* ─── notes button ─── */
+    #notesBtn {
+      position: fixed; top: 18px; right: 20px; z-index: 200;
+      background: rgba(17,17,32,.85); backdrop-filter: blur(14px);
+      border: 1px solid var(--border); border-radius: 20px;
+      padding: 5px 13px 5px 10px; color: var(--muted);
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: all .2s; font-family: inherit; letter-spacing: .04em;
+      display: flex; align-items: center; gap: 6px;
+    }
+    #notesBtn:hover { border-color: rgba(110,86,207,.5); color: var(--text); }
+    #notesBtn.active { background: rgba(110,86,207,.15); border-color: rgba(110,86,207,.4); color: var(--accent2); }
+    #notesBtn svg { opacity: .6; }
+    #notesBtn.active svg { opacity: 1; }
+
+    /* ─── notes panel ─── */
+    #notesPanel {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      max-height: 40vh;
+      background: rgba(6,6,14,.97); backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(110,86,207,.22);
+      transform: translateY(100%); transition: transform .35s ease;
+      z-index: 149; display: flex; flex-direction: column;
+    }
+    #notesPanel.open { transform: translateY(0); }
+    #notesPanelHeader {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 10vw; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #notesPanelHeader span {
+      font-size: 10px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--accent2);
+    }
+    #notesPanelClose {
+      background: none; border: 1px solid var(--border); color: var(--muted);
+      cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 8px;
+      border-radius: 4px; transition: all .2s; font-family: inherit;
+    }
+    #notesPanelClose:hover { border-color: rgba(110,86,207,.4); color: var(--text); }
+    #notesContent {
+      overflow-y: auto; padding: 16px 10vw 72px; flex: 1;
+      scrollbar-width: thin; scrollbar-color: rgba(110,86,207,.3) transparent;
+    }
+    #notesContent p {
+      font-size: 13.5px; line-height: 1.8; color: rgba(238,238,255,.62);
+      max-width: 820px; margin-bottom: 12px;
+    }
+    #notesContent p:last-child { margin-bottom: 0; }
+
+    /* ─── nav ─── */
+    #nav {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(17,17,32,.85); backdrop-filter: blur(14px);
+      border: 1px solid var(--border); border-radius: 40px;
+      padding: 7px 14px; z-index: 200;
+    }
+    .nbtn {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s;
+    }
+    .nbtn:hover { background: rgba(110,86,207,.18); border-color: rgba(110,86,207,.5); color: var(--text); }
+    .nbtn:disabled { opacity: .3; cursor: default; }
+    #counter { font-size: 12px; color: var(--muted); font-weight: 500; min-width: 52px; text-align: center; }
+
+    /* ─── slides container ─── */
+    #deck { position: relative; width: 100vw; height: 100vh; z-index: 1; }
+
+    /* ─── individual slide ─── */
+    .slide {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: flex-start;
+      padding: 80px 10vw;
+      opacity: 0; transform: translateY(18px);
+      transition: opacity .4s ease, transform .4s ease;
+      pointer-events: none;
+    }
+    .slide.active { opacity: 1; transform: translateY(0); pointer-events: all; }
+    .slide.exit   { opacity: 0; transform: translateY(-18px); }
+    .slide.center { align-items: center; text-align: center; }
+
+    /* ─── type scale ─── */
+    .eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--accent2);
+      display: flex; align-items: center; gap: 8px; margin-bottom: 18px;
+    }
+    .eyebrow::before {
+      content: ''; display: block; width: 18px; height: 1px;
+      background: var(--accent2); flex-shrink: 0;
+    }
+    .slide.center .eyebrow { justify-content: center; }
+    .slide.center .eyebrow::before { display: none; }
+
+    h1 {
+      font-size: clamp(46px, 7.5vw, 88px);
+      font-weight: 800; line-height: 1.02; letter-spacing: -.035em;
+      background: linear-gradient(140deg, #fff 0%, var(--accent3) 55%, var(--accent) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    h2 {
+      font-size: clamp(28px, 4vw, 52px);
+      font-weight: 700; line-height: 1.1; letter-spacing: -.025em;
+    }
+    .lead {
+      font-size: clamp(17px, 2.2vw, 26px);
+      font-weight: 300; line-height: 1.55; color: rgba(238,238,255,.8);
+      max-width: 640px; margin-top: 20px;
+    }
+    p {
+      font-size: clamp(14px, 1.6vw, 18px);
+      line-height: 1.7; color: rgba(238,238,255,.7); max-width: 680px;
+    }
+    p strong { color: var(--text); font-weight: 600; }
+    p + p { margin-top: 14px; }
+
+    .sp { display: block; }
+
+    /* ─── quote ─── */
+    .quote {
+      border-left: 2px solid var(--accent); padding-left: 24px;
+      font-size: clamp(19px, 2.4vw, 28px); font-style: italic;
+      color: rgba(238,238,255,.85); line-height: 1.55; max-width: 760px;
+    }
+
+    /* ─── highlight box ─── */
+    .hl {
+      background: rgba(110,86,207,.1); border: 1px solid rgba(110,86,207,.28);
+      border-radius: 10px; padding: 16px 20px;
+      font-size: clamp(13px, 1.5vw, 16px); color: var(--accent3); line-height: 1.6; max-width: 700px;
+    }
+    .hl strong { color: #fff; }
+
+    /* ─── card ─── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
+    .card.ac { border-color: rgba(110,86,207,.3); background: rgba(110,86,207,.08); }
+    .card p { max-width: none; }
+    .card h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+
+    /* ─── debate card ─── */
+    .debate {
+      background: rgba(251,146,60,.07); border: 1px solid rgba(251,146,60,.25);
+      border-radius: 14px; padding: 32px 36px; max-width: 740px;
+      font-size: clamp(15px, 1.9vw, 21px); line-height: 1.7; color: rgba(238,238,255,.88);
+    }
+    .debate strong { color: var(--orange); }
+
+    /* ─── list ─── */
+    .list { display: flex; flex-direction: column; gap: 14px; max-width: 720px; }
+    .li {
+      display: flex; align-items: flex-start; gap: 14px;
+      font-size: clamp(14px, 1.6vw, 18px); color: rgba(238,238,255,.78); line-height: 1.55;
+    }
+    .dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); margin-top: 8px; }
+    .dot.g { background: var(--green); }
+    .dot.o { background: var(--orange); }
+    .dot.r { background: var(--red); }
+    .li strong { color: var(--text); }
+
+    /* ─── numbered list ─── */
+    .nlist { display: flex; flex-direction: column; gap: 16px; max-width: 720px; }
+    .nli { display: flex; align-items: flex-start; gap: 16px; font-size: clamp(14px, 1.6vw, 18px); color: rgba(238,238,255,.78); line-height: 1.55; }
+    .nnum { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: rgba(110,86,207,.25); border: 1px solid rgba(110,86,207,.4); color: var(--accent2); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+    .nli strong { color: var(--text); }
+
+    /* ─── grid helpers ─── */
+    .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; max-width: 860px; }
+    .g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; max-width: 860px; }
+    .g2 .card p, .g3 .card p { font-size: 14px; color: var(--muted); max-width: none; }
+    .g2 .card strong, .g3 .card strong { color: var(--text); }
+
+    /* ─── stat ─── */
+    .stat { text-align: center; }
+    .sn {
+      font-size: clamp(34px, 5vw, 58px); font-weight: 800; letter-spacing: -.03em;
+      background: linear-gradient(135deg, var(--accent3), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1;
+    }
+    .sl { font-size: 12px; color: var(--muted); font-weight: 500; margin-top: 6px; line-height: 1.4; }
+
+    /* ─── company cards ─── */
+    .cc { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; }
+    .cc h4 { font-size: 15px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .cc p { font-size: 13px; color: var(--muted); max-width: none; line-height: 1.55; }
+    .cc p strong { color: var(--text); }
+    .cc.pur { border-color: rgba(110,86,207,.35); }
+    .cc.grn { border-color: rgba(74,222,128,.3); }
+    .cc.org { border-color: rgba(251,146,60,.3); }
+    .cc.red { border-color: rgba(248,113,113,.3); }
+
+    /* ─── orange/green stat variants ─── */
+    .sn.org {
+      background: linear-gradient(135deg, #fff, var(--orange));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .sn.grn {
+      background: linear-gradient(135deg, #fff, var(--green));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    /* ─── tag ─── */
+    .tag {
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .07em;
+      text-transform: uppercase; padding: 3px 8px; border-radius: 4px; margin-bottom: 6px;
+    }
+    .tag.pur { background: rgba(110,86,207,.2); color: var(--accent2); }
+    .tag.org { background: rgba(251,146,60,.15); color: var(--orange); }
+    .tag.grn { background: rgba(74,222,128,.15); color: var(--green); }
+    .tag.red { background: rgba(248,113,113,.15); color: var(--red); }
+
+    @media (max-width: 700px) {
+      .slide { padding: 60px 6vw; }
+      .g2, .g3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="glow"></div>
+<div id="progress"></div>
+
+<!-- block pips -->
+<div id="blocks">
+  <div class="bpip on" style="width:24px" data-b="0"></div>
+  <div class="bpip"    style="width:54px" data-b="1"></div>
+  <div class="bpip"    style="width:54px" data-b="2"></div>
+  <div class="bpip"    style="width:54px" data-b="3"></div>
+  <div class="bpip"    style="width:54px" data-b="4"></div>
+  <div class="bpip"    style="width:54px" data-b="5"></div>
+  <div class="bpip"    style="width:54px" data-b="6"></div>
+</div>
+
+<!-- notes toggle button -->
+<button id="notesBtn" onclick="toggleNotes()" title="Notas do apresentador · tecla N">
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+    <rect x="1.5" y="1.5" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+    <path d="M4 4.5h5M4 6.5h5M4 8.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+  </svg>
+  NOTAS
+</button>
+
+<div id="deck">
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 01 · COVER
+  ══════════════════════════════════════════ -->
+  <div class="slide center active" data-b="0">
+    <div class="eyebrow">Março 2026 · Aula 2</div>
+    <h1>IA Aplicada ao<br>Marketing</h1>
+    <p class="lead" style="text-align:center;">Do prompt ao sistema.<br>Da ferramenta ao julgamento.</p>
+    <div class="snotes" style="display:none;">
+      <p>A primeira aula foi sobre perceber o que a IA é — como funciona, de onde vem, o que custa, quem são os jogadores. Esta é sobre o que fazes com ela amanhã de manhã no teu trabalho.</p>
+      <p>Não é um tutorial. Não vais sair daqui a dominar nenhuma ferramenta específica — porque daqui a seis meses essa ferramenta pode já não existir ou ter sido ultrapassada. O que vais sair a dominar é uma forma de pensar sobre como usar IA em contexto criativo e estratégico sem perder o que te torna valioso como profissional.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 02 · ANTES DE COMEÇAR
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="0">
+    <div class="eyebrow">Antes de começar</div>
+    <h2 style="max-width:680px;">Não é um tutorial.<br>É uma forma de pensar.</h2>
+    <div class="sp" style="height:28px"></div>
+    <div class="list" style="align-items:center; text-align:left;">
+      <div class="li"><span class="dot"></span><span>Não vais sair a dominar uma ferramenta específica — ferramentas mudam</span></div>
+      <div class="li"><span class="dot"></span><span>Vais sair a dominar uma <strong>forma de pensar</strong> sobre IA em contexto criativo</span></div>
+      <div class="li"><span class="dot"></span><span>A estrutura é deliberadamente prática — há exercícios. Traz o portátil.</span></div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>A primeira aula foi sobre perceber o que a IA é. Esta é sobre o que fazes com ela.</p>
+      <p>Não é um tutorial. Não vais sair daqui a dominar nenhuma ferramenta específica — porque daqui a seis meses essa ferramenta pode já não existir ou ter sido ultrapassada. O que vais sair a dominar é uma forma de pensar sobre como usar IA em contexto criativo e estratégico sem perder o que te torna valioso como profissional.</p>
+      <p>A estrutura é deliberadamente prática. Há exercícios ao longo da aula. Traz o portátil.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 03 · BLOCO 1 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="1">
+    <div class="eyebrow">Bloco 1 · Prompting</div>
+    <h1>A literacia que<br>ninguém te ensinou.</h1>
+    <p class="lead" style="text-align:center;">A qualidade do output é proporcional<br>à qualidade do input.</p>
+    <div class="snotes" style="display:none;">
+      <p>Bloco 1 — Prompting: a literacia que ninguém te ensinou.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 04 · O PROBLEMA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">O problema</div>
+    <h2>O problema não é a IA.<br>É o briefing.</h2>
+    <div class="sp" style="height:28px"></div>
+    <div class="quote">
+      "Escreve-me um email para um cliente."<br>
+      "Cria uma campanha para este produto."
+    </div>
+    <div class="sp" style="height:24px"></div>
+    <p>Pensa no teu melhor colaborador criativo. Se lhe dissesses "escreve-me um email para um cliente" sem mais contexto, o resultado seria igualmente mediano. Não porque ele não seja capaz — mas porque <strong>não lhe deste o que precisa</strong> para ser capaz.</p>
+    <div class="snotes" style="display:none;">
+      <p>Faz a pergunta à sala: como é que normalmente começam uma conversa com o ChatGPT ou o Claude?</p>
+      <p>A resposta típica é uma pergunta curta. "Escreve-me um email para um cliente." "Cria uma campanha para este produto." "Resume este artigo."</p>
+      <p>E depois a pessoa lê a resposta, acha que é mediana, e conclui que a IA não é assim tão boa. Ou pior — publica a resposta mediana porque é suficientemente aceitável e poupa tempo.</p>
+      <p>O problema não é a IA. É o briefing. Pensa no teu melhor colaborador criativo. Se lhe dissesses "escreve-me um email para um cliente" sem mais contexto, o resultado seria igualmente mediano. Não porque ele não seja capaz — mas porque não lhe deste o que precisa para ser capaz.</p>
+      <p>A IA funciona da mesma forma. A qualidade do output é proporcional à qualidade do input. A diferença é que com um colaborador humano há uma conversa natural de alinhamento — ele pergunta, clarifica, empurra de volta. Com a IA, tens de fazer esse trabalho antes de carregar em enter.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 05 · OS 6 ELEMENTOS
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Os elementos de um bom prompt</div>
+    <h2>Um prompt bem construído<br>tem os mesmos elementos<br>de um bom brief criativo.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="list">
+      <div class="li"><span class="dot"></span><span><strong>Papel e contexto</strong> — quem é a IA nesta conversa?</span></div>
+      <div class="li"><span class="dot"></span><span><strong>Objetivo claro</strong> — o que queres que aconteça depois desta resposta?</span></div>
+      <div class="li"><span class="dot"></span><span><strong>Audiência específica</strong> — para quem é isto, concretamente?</span></div>
+      <div class="li"><span class="dot"></span><span><strong>Contexto e restrições</strong> — o que a IA precisa de saber que não está implícito?</span></div>
+      <div class="li"><span class="dot"></span><span><strong>Formato de output</strong> — quanto texto, que estrutura, para onde vai?</span></div>
+      <div class="li"><span class="dot"></span><span><strong>Exemplos</strong> — o elemento mais subestimado</span></div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Um bom prompt tem os mesmos elementos de um bom brief criativo. Não é coincidência — é a mesma estrutura de pensamento aplicada a um interlocutor diferente.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 06 · ELEMENTOS PT.1
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Elementos 1 / 2</div>
+    <h2>Papel, Objetivo,<br>Audiência.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="g3">
+      <div class="card ac">
+        <h4>Papel e contexto</h4>
+        <p>"Age como um diretor criativo sénior com experiência em marcas de luxo" produz resultados radicalmente diferentes de "age como um copywriter de resposta direta."</p>
+      </div>
+      <div class="card">
+        <h4>Objetivo claro</h4>
+        <p>"Escreve um email" é um formato. "Escreve um email que convença o cliente a marcar uma reunião esta semana" é um <strong>objetivo</strong>.</p>
+      </div>
+      <div class="card">
+        <h4>Audiência específica</h4>
+        <p>"Para um diretor de marketing B2B, 45 anos, cético em relação a fornecedores externos, que leu a tua proposta mas ainda não respondeu."</p>
+      </div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Papel e contexto: quem é a IA nesta conversa? O papel ativa diferentes padrões de linguagem e abordagem do enorme corpus em que foi treinada.</p>
+      <p>Objetivo claro: o que queres que aconteça depois desta resposta? "Escreve um email" é um formato. "Escreve um email que convença o cliente a marcar uma reunião esta semana" é um objetivo. A diferença no output é consistente.</p>
+      <p>Audiência específica: para quem é isto? "Para um diretor de marketing de uma empresa de seguros B2B, 45 anos, cético em relação a fornecedores externos, que leu o teu relatório de proposta mas ainda não respondeu" é uma audiência. "Para um cliente" não é.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 07 · ELEMENTOS PT.2
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Elementos 2 / 2</div>
+    <h2>Contexto, Formato,<br>Exemplos.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="g3">
+      <div class="card">
+        <h4>Contexto e restrições</h4>
+        <p>Tom da marca. Restrições legais. O que já foi tentado e não funcionou. O que <strong>não pode aparecer</strong> na resposta.</p>
+      </div>
+      <div class="card">
+        <h4>Formato de output</h4>
+        <p>Quanto texto? Que estrutura? Com ou sem subtítulos? Para onde vai — email, slide, post, brief interno?</p>
+      </div>
+      <div class="card ac">
+        <h4>Exemplos ✦</h4>
+        <p>"No estilo deste exemplo:" seguido de um texto que gostas produz calibragem de tom muito mais eficaz do que qualquer adjetivo. <strong>Um exemplo bom é uma instrução precisa.</strong></p>
+      </div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Contexto e restrições: o que a IA precisa de saber que não está implícito? Tom da marca. Restrições legais ou regulatórias. O que já foi tentado e não funcionou. O que não pode aparecer na resposta.</p>
+      <p>Formato de output: quanto texto? Em que estrutura? Com ou sem subtítulos? Para onde vai este conteúdo — um email, um slide, um post, um brief interno? A mesma informação estruturada de formas diferentes serve propósitos diferentes.</p>
+      <p>Exemplos: este é o elemento mais subestimado. "No estilo deste exemplo:" seguido de um texto que gostas produz calibragem de tom muito mais eficaz do que qualquer adjetivo. "Soa a humano", "soa a conversacional", "soa a premium" — são instruções vagas. Um exemplo bom é uma instrução precisa.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 08 · EXERCÍCIO AO VIVO
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="1">
+    <div class="eyebrow">Exercício ao vivo · 10 minutos</div>
+    <div class="debate" style="text-align:left;">
+      Escolhem uma tarefa de copy real — um email, um post, um headline.<br><br>
+      <strong>Primeiro:</strong> escrevem o prompt que usariam normalmente. Correm e veem o resultado.<br><br>
+      <strong>Depois:</strong> reconstroem o prompt com os seis elementos. Correm de novo e comparam.<br><br>
+      Colam tudo num doc de texto para entrega.
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Exercício ao vivo — 10 minutos. Escolham uma tarefa de copy real — um email, um post, um headline. Primeiro escrevem o prompt que usariam normalmente. Corram e vejam resultado. Depois reconstroem o prompt com os seis elementos indicados. Corram de novo e comparem. Colem tudo num doc de texto para entrega.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 09 · PROMPTING COMO DIÁLOGO
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Prompting como diálogo</div>
+    <h2>O prompt perfeito<br>raramente existe à<br>primeira tentativa.</h2>
+    <div class="sp" style="height:24px"></div>
+    <p>A abordagem mais produtiva é tratar a sessão com a IA como uma <strong>conversa de trabalho</strong>. Começas com um briefing razoável, vês o que vem, e iteras.</p>
+    <div class="sp" style="height:18px"></div>
+    <div class="hl">
+      "Isto está no caminho certo mas o tom está demasiado formal — reescreve mais direto e sem jargão corporativo."<br>
+      "A segunda versão está melhor mas o terceiro parágrafo perde o foco — mantém a estrutura mas reescreve esse parágrafo com o argumento X em vez do Y."
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>O erro mais comum depois de perceber os elementos de um bom prompt é tentar construir o prompt perfeito à primeira. Isso existe, mas raramente à primeira tentativa.</p>
+      <p>A abordagem mais produtiva é tratar a sessão com a IA como uma conversa de trabalho. Começas com um briefing razoável, vês o que vem, e iteras. Esta forma de trabalhar — que os profissionais de IA chamam de chain of thought prompting ou simplesmente iteração guiada — produz resultados muito superiores a um único prompt elaborado.</p>
+      <p>E tem um benefício secundário: o processo de articular o que não está certo força-te a clarificar o que queres, o que é por si só uma prática de pensamento estratégico.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 10 · O QUE NÃO SE DELEGA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">O que não se delega</div>
+    <h2>O músculo que<br>não podes deixar atrofiar.</h2>
+    <div class="sp" style="height:28px"></div>
+    <p>A eficiência na produção não é o mesmo que eficácia na comunicação. A IA é muito boa a gerar texto que <strong>parece correto</strong>, que soa plausível, que não tem erros óbvios.</p>
+    <p>É menos boa a gerar texto que é verdadeiramente preciso, que tem ponto de vista, que toma riscos criativos intencionais, que está calibrado para um contexto cultural específico.</p>
+    <div class="sp" style="height:18px"></div>
+    <div class="hl" style="max-width:680px;">
+      O julgamento sobre se o resultado é bom — não tecnicamente, mas estrategicamente — <strong>continua a ser teu.</strong>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Há uma tensão que vale a pena nomear: quanto mais te tornas bom a prompting, mais eficiente te tornas a produzir output com IA. E mais eficiente te tornas, mais tentador é escalar essa produção — mais conteúdo, mais rápido, com menos revisão.</p>
+      <p>A eficiência na produção não é o mesmo que eficácia na comunicação. A IA é muito boa a gerar texto que parece correto, que soa plausível, que não tem erros óbvios. É menos boa a gerar texto que é verdadeiramente preciso, que tem ponto de vista, que toma riscos criativos intencionais, que está calibrado para um contexto cultural específico que não está explícito nos dados de treino.</p>
+      <p>O julgamento sobre se o resultado é bom — não tecnicamente, mas estrategicamente — continua a ser teu. É o músculo que não podes deixar atrofiar.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 11 · BLOCO 2 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="2">
+    <div class="eyebrow">Bloco 2 · Fluxos de Trabalho</div>
+    <h1>Do prompt ao<br>sistema.</h1>
+    <p class="lead" style="text-align:center;">Quatro fluxos concretos para marketing e comunicação.</p>
+    <div class="snotes" style="display:none;">
+      <p>Bloco 2 — Fluxos de trabalho reais. A maioria das pessoas usa IA como uma série de interações isoladas. Profissionais que integram IA bem no seu trabalho pensam em fluxos — sequências de tarefas onde o output de uma é o input da seguinte, e onde o contexto se acumula em vez de se perder.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 12 · DO PROMPT AO SISTEMA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">A diferença</div>
+    <h2>Interações isoladas<br>vs. fluxo de trabalho.</h2>
+    <div class="sp" style="height:28px"></div>
+    <div class="g2" style="max-width:780px;">
+      <div class="card">
+        <h4>Como a maioria usa</h4>
+        <p>Abrem uma conversa, fazem uma coisa, fecham. Na próxima tarefa, <strong>começam do zero.</strong></p>
+      </div>
+      <div class="card ac">
+        <h4>Como os melhores usam</h4>
+        <p>Pensam em fluxos — sequências onde o output de uma tarefa é o input da seguinte. O <strong>contexto acumula-se</strong> em vez de se perder.</p>
+      </div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>A maioria das pessoas usa IA como uma série de interações isoladas. Abrem uma conversa, fazem uma coisa, fecham. Na próxima tarefa, começam do zero.</p>
+      <p>Profissionais que integram IA bem no seu trabalho pensam em fluxos — sequências de tarefas onde o output de uma é o input da seguinte, e onde o contexto se acumula em vez de se perder. Vamos ver quatro fluxos concretos que fazem sentido para marketing e comunicação.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 13 · FLUXO 1
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">Fluxo 1</div>
+    <h2>Investigação e síntese<br>de audiência.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="nlist">
+      <div class="nli"><span class="nnum">1</span><span>Descreves o produto, o mercado e o que já sabes sobre a audiência. Pedes à IA para identificar as <strong>tensões e contradições típicas</strong> neste tipo de consumidor.</span></div>
+      <div class="nli"><span class="nnum">2</span><span>Pedes uma lista de <strong>objeções específicas</strong> que este consumidor provavelmente tem ao teu produto — não as genéricas, as que correspondem ao contexto que descreveste.</span></div>
+      <div class="nli"><span class="nnum">3</span><span>Com base nessas tensões, pedes <strong>três hipóteses de posicionamento</strong> com ângulos diferentes — não o posicionamento final, hipóteses para testares internamente.</span></div>
+    </div>
+    <div class="sp" style="height:16px"></div>
+    <p style="font-size:13px; color:var(--muted);">O que produz não é investigação. É um <strong style="color:var(--accent3);">mapa de partida</strong> que acelera o processo de chegares às perguntas certas.</p>
+    <div class="snotes" style="display:none;">
+      <p>Ponto de partida: tens um novo cliente ou produto e precisas de perceber a audiência antes de começar a criar.</p>
+      <p>A IA não substitui investigação primária — não pode falar com os teus clientes. Mas é extraordinariamente boa a sintetizar o que já existe, a identificar padrões em dados qualitativos, e a ajudar-te a estruturar hipóteses que depois validas.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 14 · FLUXO 2
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">Fluxo 2</div>
+    <h2>Geração e variação<br>de copy.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="nlist">
+      <div class="nli"><span class="nnum">1</span><span>Defines a tarefa com todos os elementos do brief: produto, audiência, objetivo, restrições, tom.</span></div>
+      <div class="nli"><span class="nnum">2</span><span>Pedes não uma versão mas <strong>cinco versões com abordagens radicalmente diferentes</strong> — emocional, racional, provocatória, minimalista, narrativa. A instrução "radicalmente diferentes" é importante.</span></div>
+      <div class="nli"><span class="nnum">3</span><span>Usas as cinco versões como <strong>matéria-prima</strong> — o argumento da segunda, o ritmo da quarta, o ângulo da primeira. Pedes uma nova versão que integre esses elementos específicos.</span></div>
+    </div>
+    <div class="sp" style="height:16px"></div>
+    <div class="hl" style="max-width:680px; font-size:13px;">
+      A versão final é tua — editada, afinada, com a camada de julgamento humano que distingue o que é tecnicamente correto do que é verdadeiramente bom.
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>O erro neste fluxo é pedir à IA o texto final. O valor está em usar a IA para explorar o espaço de possibilidades antes de decidires.</p>
+      <p>Sem a instrução "radicalmente diferentes" a IA tende a produzir variações tímidas da mesma abordagem.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 15 · FLUXO 3
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">Fluxo 3</div>
+    <h2>Briefing de criativos.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="nlist">
+      <div class="nli"><span class="nnum">1</span><span>Fazes um <strong>brain dump</strong> — tudo o que sabes sobre o projeto, sem estrutura, como falarias a um colega num corredor. Pedes à IA para identificar o que falta para ter um brief completo.</span></div>
+      <div class="nli"><span class="nnum">2</span><span>Respondes às lacunas que identifica. Agora tens a matéria-prima de um brief.</span></div>
+      <div class="nli"><span class="nnum">3</span><span>Pedes à IA para estruturar num formato de brief com secções claras: contexto, problema de comunicação, audiência, mensagem-chave, tom, restrições, entregáveis, critérios de sucesso.</span></div>
+    </div>
+    <div class="sp" style="height:16px"></div>
+    <p style="font-size:13px; color:var(--muted);">O que a IA estruturou é um bom rascunho — tu adicionas o contexto que não verbalizaste, as nuances que só tu conheces, o ponto de vista estratégico que é teu.</p>
+    <div class="snotes" style="display:none;">
+      <p>Este é um dos usos mais subestimados. Um brief mal escrito custa tempo a toda a equipa. A IA é muito boa a estruturar, a identificar lacunas de informação, e a formular o problema de formas que a equipa criativa pode trabalhar.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 16 · FLUXO 4
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">Fluxo 4</div>
+    <h2>Análise e síntese<br>de feedback.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="nlist">
+      <div class="nli"><span class="nnum">1</span><span>Coloca o material bruto na conversa — respostas a inquéritos, comentários de redes sociais, transcrições, reviews.</span></div>
+      <div class="nli"><span class="nnum">2</span><span>Pedes identificação dos <strong>temas recorrentes</strong>, com exemplos específicos de cada um.</span></div>
+      <div class="nli"><span class="nnum">3</span><span>Pedes que os temas sejam ordenados por <strong>frequência e por intensidade emocional</strong> — as menções mais passionais vs. as mais repetidas são sinais diferentes.</span></div>
+      <div class="nli"><span class="nnum">4</span><span>Pedes hipóteses sobre o que está <strong>por baixo do que as pessoas dizem</strong> — o que pode estar a gerar este padrão de feedback que não é explícito nas respostas.</span></div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Quando tens grandes volumes de feedback qualitativo — respostas a inquéritos, comentários de redes sociais, transcrições de focus groups, reviews — a IA é uma ferramenta de análise temática muito eficaz.</p>
+      <p>O output não é a análise final. É um ponto de partida que reduz horas de trabalho a minutos e te permite chegar mais depressa às perguntas que importam.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 17 · BLOCO 3 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="3">
+    <div class="eyebrow">Bloco 3 · Voz de Marca</div>
+    <h1>Identidade e o<br>problema da<br>mediocridade.</h1>
+    <p class="lead" style="text-align:center;">A IA produz o centro da distribuição.<br>As marcas fortes vivem nas margens.</p>
+    <div class="snotes" style="display:none;">
+      <p>Bloco 3 — Voz de marca, identidade e o problema da mediocridade.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 18 · O PROBLEMA DA MEDIOCRIDADE
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">O problema que ninguém fala abertamente</div>
+    <h2>O conteúdo começa<br>a soar igual.</h2>
+    <div class="sp" style="height:24px"></div>
+    <p>A IA é extraordinariamente boa a produzir o <strong>centro da distribuição</strong>. O texto que não ofende ninguém, que soa profissional, que comunica a informação claramente.</p>
+    <div class="sp" style="height:18px"></div>
+    <div class="quote">
+      Marcas com voz forte não vivem no centro da distribuição. Vivem nas margens — no tom específico, no ritmo particular, na forma de entrar num argumento.
+    </div>
+    <div class="sp" style="height:18px"></div>
+    <p>A tensão é real: <strong>eficiência na produção versus integridade da voz.</strong> A resolução não é evitar a IA — é dar-lhe contexto suficiente para que ela se aproxime da voz certa.</p>
+    <div class="snotes" style="display:none;">
+      <p>Quando as marcas começam a usar IA para produção de conteúdo em escala, acontece algo gradual e difícil de nomear: o conteúdo começa a soar igual. Não igual ao conteúdo da concorrência especificamente — igual a tudo. Um tom neutro, competente, ligeiramente sem personalidade que é o resultado natural de um sistema treinado em média estatística de linguagem humana.</p>
+      <p>Para muitas tarefas, isso é suficiente e o ganho de eficiência compensa. Mas marcas com voz forte não vivem no centro da distribuição. Vivem nas margens — no tom específico, no ritmo particular, na forma de entrar num argumento, nas palavras que usam e nas que deliberadamente evitam. É essa especificidade que constrói reconhecimento e preferência ao longo do tempo.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 19 · 3 CAMADAS DE VOZ
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">Como se define voz de marca para a IA</div>
+    <h2>Três camadas de contexto.</h2>
+    <div class="sp" style="height:22px"></div>
+    <div class="g3">
+      <div class="card ac">
+        <h4>1 · Exemplos de referência</h4>
+        <p>Os dez melhores textos que a marca alguma vez produziu. <strong>"Analisa o que têm em comum — ritmo, estrutura de frase, tipo de argumento, vocabulário — e aplica ao que te vou pedir."</strong></p>
+      </div>
+      <div class="card">
+        <h4>2 · Vocabulário e anti-vocabulário</h4>
+        <p>Palavras que a marca usa e palavras que a marca <strong>nunca usaria.</strong> "Nunca usa 'solução' nem 'sinergias'. Prefere verbos a substantivos. Usa frases curtas quando quer impacto."</p>
+      </div>
+      <div class="card">
+        <h4>3 · Eixos de tom</h4>
+        <p>Escalas bipolares: formal/informal, sério/bem-disposto, assertivo/consultivo, técnico/acessível. <strong>Posicionamentos relativos, não absolutos.</strong></p>
+      </div>
+    </div>
+    <div class="sp" style="height:16px"></div>
+    <p style="font-size:13px; color:var(--muted);">A combinação das três camadas é o que hoje se chama de <strong style="color:var(--accent3);">brand voice guide para IA</strong> — um dos documentos estratégicos mais valiosos que uma marca pode ter.</p>
+    <div class="snotes" style="display:none;">
+      <p>Há três camadas de contexto que, quando fornecidas consistentemente, melhoram significativamente a calibragem de voz.</p>
+      <p>Exemplos de referência: o método mais eficaz. Não é preciso analisá-los — podes incluí-los diretamente no contexto como referência.</p>
+      <p>Vocabulário e anti-vocabulário: parece trivial. O efeito no output é consistente.</p>
+      <p>Posicionamento de tom em eixos: define a voz em escalas bipolares — não como absolutos mas como posicionamentos relativos. "Mais para o informal mas não coloquial, mais para o assertivo mas nunca agressivo."</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 20 · O QUE A IA NÃO CAPTURA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">Os limites da formalização</div>
+    <h2>O que a IA não<br>consegue capturar.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="list">
+      <div class="li"><span class="dot o"></span><span>O humor que depende de <strong>timing cultural específico</strong></span></div>
+      <div class="li"><span class="dot o"></span><span>A ironia que só funciona se a audiência <strong>partilha um contexto implícito</strong></span></div>
+      <div class="li"><span class="dot o"></span><span>A referência cultural relevante para um <strong>segmento demográfico preciso</strong></span></div>
+      <div class="li"><span class="dot o"></span><span>O risco criativo deliberado de dizer algo que <strong>a maioria das marcas não diria</strong></span></div>
+    </div>
+    <div class="sp" style="height:20px"></div>
+    <div class="hl" style="max-width:680px;">
+      A decisão de ir ao limite, de arriscar, de escolher o desconforto estratégico sobre o conforto estatístico — isso é um <strong>julgamento humano que não se automatiza.</strong>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Há dimensões de voz que resistem à formalização. O humor que depende de timing cultural específico. A ironia que só funciona se a audiência partilha um contexto implícito. A referência cultural que é relevante para um segmento demográfico preciso. O risco criativo deliberado de dizer algo que a maioria das marcas não diria.</p>
+      <p>Estes são precisamente os elementos que constroem memória de marca a longo prazo — os momentos em que a audiência pensa "isto é mesmo eles." A IA consegue aproximar-se quando tem exemplos suficientes. Mas a decisão de ir ao limite, de arriscar, de escolher o desconforto estratégico sobre o conforto estatístico — isso é um julgamento humano que não se automatiza.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 21 · BLOCO 4 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="4">
+    <div class="eyebrow">Bloco 4 · RAG e Memória</div>
+    <h1>Como dar<br>memória à IA.</h1>
+    <p class="lead" style="text-align:center;">O problema da amnésia — e como o resolver.</p>
+    <div class="snotes" style="display:none;">
+      <p>Bloco 4 — RAG, contexto e como dar memória à IA.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 22 · O PROBLEMA DA AMNÉSIA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="4">
+    <div class="eyebrow">O problema</div>
+    <h2>Cada nova conversa<br>começa do zero.</h2>
+    <div class="sp" style="height:28px"></div>
+    <div class="g2" style="max-width:760px;">
+      <div class="card">
+        <h4>A frustração comum</h4>
+        <p>A IA não sabe quem és, não sabe o cliente, não conhece a estratégia, não recorda o que ficou decidido na sessão anterior. Tens de repetir o contexto <strong>constantemente.</strong></p>
+      </div>
+      <div class="card ac">
+        <h4>Existe uma solução</h4>
+        <p>Perceber como funciona abre um conjunto de possibilidades que a maioria dos utilizadores <strong>nem sabe que existe.</strong></p>
+      </div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Uma das frustrações mais comuns de quem usa IA no trabalho é ter de repetir o contexto constantemente. Cada nova conversa começa do zero — a IA não sabe quem és, não sabe o cliente, não conhece a estratégia, não recorda o que ficou decidido na sessão anterior.</p>
+      <p>Há uma forma de resolver isto, e percebê-la abre um conjunto de possibilidades que a maioria dos utilizadores nem sabe que existe.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 23 · O QUE É RAG
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="4">
+    <div class="eyebrow">Retrieval-Augmented Generation</div>
+    <h2>O consultor que leu<br>os teus documentos.</h2>
+    <div class="sp" style="height:24px"></div>
+    <p>Em vez de a IA responder só com o que aprendeu durante o treino, ela <strong>consulta primeiro uma base de conhecimento específica que tu defines</strong> — os teus documentos, as tuas guidelines, o teu histórico — e usa essa informação como contexto.</p>
+    <div class="sp" style="height:20px"></div>
+    <div class="hl" style="max-width:680px;">
+      A diferença entre um consultor externo que sabe muito sobre marketing em geral, e um consultor externo que <strong>leu todos os teus documentos estratégicos antes de entrar na reunião.</strong> O segundo é radicalmente mais útil.
+    </div>
+    <div class="sp" style="height:16px"></div>
+    <p style="font-size:13px; color:var(--muted);">Para não-técnicos: <strong style="color:var(--accent3);">NotebookLM</strong> da Google, <strong style="color:var(--accent3);">Claude Projects</strong>, <strong style="color:var(--accent3);">GPTs customizados</strong> — todos implementam variantes deste mecanismo.</p>
+    <div class="snotes" style="display:none;">
+      <p>Retrieval-Augmented Generation — o nome técnico para um mecanismo simples: em vez de a IA responder só com o que aprendeu durante o treino, ela consulta primeiro uma base de conhecimento específica que tu defines — os teus documentos, as tuas guidelines, o teu histórico — e usa essa informação como contexto para gerar a resposta.</p>
+      <p>Para utilizadores não-técnicos, isto materializa-se em ferramentas como o NotebookLM da Google — onde carregas documentos e a IA responde com base neles. Ou nos Claude Projects e GPTs customizados — onde defines um conjunto de documentos e instruções que persistem em todas as conversas dentro daquele projeto.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 24 · RAG NA PRÁTICA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="4">
+    <div class="eyebrow">O que isto significa na prática</div>
+    <h2>RAG para marketing.</h2>
+    <div class="sp" style="height:22px"></div>
+    <div class="g3">
+      <div class="card ac">
+        <h4>Agência</h4>
+        <p>Um projeto por cliente — estratégia de marca, guidelines de comunicação, exemplos de conteúdo aprovado, reports de performance. Cada membro da equipa começa com a IA já contextualizada. <strong>Acabou de copiar e colar guidelines em cada prompt.</strong></p>
+      </div>
+      <div class="card">
+        <h4>Marca</h4>
+        <p>Um assistente interno que conhece o catálogo de produtos, as FAQs, a voz de marca, as restrições legais. O copywriter não precisa de memorizar tudo — tem um colaborador que sabe tudo e <strong>nunca se esquece.</strong></p>
+      </div>
+      <div class="card">
+        <h4>Gestor de conteúdo</h4>
+        <p>Um repositório dos melhores conteúdos históricos da marca, indexado e pesquisável, que informa qualquer nova criação com referências específicas do arquivo.</p>
+      </div>
+    </div>
+    <div class="sp" style="height:14px"></div>
+    <p style="font-size:12px; color:var(--muted);">A qualidade da recuperação depende da qualidade da organização dos documentos. Entra lixo, sai lixo — mas em forma de parágrafo bem escrito.</p>
+    <div class="snotes" style="display:none;">
+      <p>Para uma agência: um projeto por cliente, onde carregas a estratégia de marca, as guidelines de comunicação, os exemplos de conteúdo aprovado, os reports de performance das campanhas anteriores. Cada membro da equipa começa cada sessão com a IA já contextualizada.</p>
+      <p>Para uma marca: um assistente interno que conhece o catálogo de produtos, as FAQs de apoio ao cliente, a voz de marca, as restrições legais e regulatórias. O copywriter que o usa não precisa de memorizar tudo.</p>
+      <p>A limitação — a que já conhecemos: a context window tem um teto. E a qualidade da recuperação depende da qualidade da organização dos documentos que forneces.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 25 · BLOCO 5 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="5">
+    <div class="eyebrow">Bloco 5 · Avaliação de Output</div>
+    <h1>Pensar de<br>forma crítica.</h1>
+    <p class="lead" style="text-align:center;">Cinco perguntas que tomam 60 segundos<br>e que ativam o modo crítico.</p>
+    <div class="snotes" style="display:none;">
+      <p>Bloco 5 — Avaliação de output e pensamento crítico.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 26 · O MÚSCULO QUE ESTÁ A ATROFIAR
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="5">
+    <div class="eyebrow">O padrão perigoso</div>
+    <h2>A aceitação gradual<br>do output medíocre.</h2>
+    <div class="sp" style="height:24px"></div>
+    <p>Não é preguiça. É um fenómeno cognitivo bem documentado — quando o custo de produzir algo cai dramaticamente, o <strong>limiar de aceitação também tende a cair.</strong></p>
+    <div class="sp" style="height:16px"></div>
+    <div class="quote">
+      O que antes levaria uma hora a escrever e seria revisto com atenção, agora leva dois minutos e é publicado com uma leitura rápida.
+    </div>
+    <div class="sp" style="height:16px"></div>
+    <div class="hl" style="max-width:680px;">
+      O problema não é a velocidade. O problema é quando a velocidade <strong>substitui o julgamento.</strong>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Há um padrão que os profissionais de marketing que usam IA intensivamente começam a desenvolver sem se aperceberem: a aceitação gradual de output medíocre porque é "bom o suficiente" e foi produzido de forma muito rápida.</p>
+      <p>Não é preguiça. É um fenómeno cognitivo bem documentado — quando o custo de produzir algo cai dramaticamente, o limiar de aceitação também tende a cair. O que antes levaria uma hora a escrever e seria revisto com atenção, agora leva dois minutos e é publicado com uma leitura rápida.</p>
+      <p>O problema não é a velocidade. O problema é quando a velocidade substitui o julgamento.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 27 · 5 PERGUNTAS DE AVALIAÇÃO
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="5">
+    <div class="eyebrow">Framework de avaliação</div>
+    <h2>Cinco perguntas antes<br>de avançares.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="list">
+      <div class="li"><span class="dot"></span><span><strong>É factualmente correto?</strong> Não apenas plausível — correto. Qualquer facto específico precisa de verificação independente. Esta é a regra mais importante.</span></div>
+      <div class="li"><span class="dot"></span><span><strong>Está alinhado com a marca?</strong> Não apenas no tom — na substância. Reflecte os valores e o posicionamento?</span></div>
+      <div class="li"><span class="dot"></span><span><strong>É adequado ao contexto cultural?</strong> A IA foi treinada maioritariamente em dados anglo-saxónicos. Para audiências portuguesas ou brasileiras, há sempre calibragem a fazer.</span></div>
+      <div class="li"><span class="dot"></span><span><strong>Tem ponto de vista?</strong> O centro da distribuição é o que toda a gente diria. O teu conteúdo tem algo que o distingue?</span></div>
+      <div class="li"><span class="dot"></span><span><strong>Seria melhor com menos?</strong> A IA tende para a prolixidade. A edição mais importante é cortar ao essencial.</span></div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Antes de avançar com qualquer output gerado com IA, vale a pena ter um conjunto de perguntas de verificação. Não uma checklist burocrática — cinco perguntas que tomam 60 segundos e que ativam o modo crítico.</p>
+      <p>É factualmente correto? A IA mente com confiança. Qualquer facto específico — data, estatística, citação, nome de pessoa — precisa de verificação independente.</p>
+      <p>Seria melhor com menos? A IA tende para a prolixidade. Mais palavras, mais estruturas, mais subtítulos, mais qualificações. A edição mais importante que podes fazer num texto gerado por IA é cortá-lo.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 28 · BLOCO 6 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="6">
+    <div class="eyebrow">Bloco 6 · Processo Criativo</div>
+    <h1>IA no processo<br>vs. IA como<br>processo.</h1>
+    <p class="lead" style="text-align:center;">Uma distinção que raramente é feita<br>e que muda tudo.</p>
+    <div class="snotes" style="display:none;">
+      <p>Bloco 6 — IA no processo criativo vs. IA como produto final. Há uma distinção que raramente é feita explicitamente e que muda tudo.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 29 · DOIS MODOS
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="6">
+    <div class="eyebrow">Dois modos de trabalho</div>
+    <h2>A distinção que<br>muda tudo.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="g2" style="max-width:820px;">
+      <div class="card ac">
+        <h4>IA no processo</h4>
+        <p>Usas a IA como ferramenta de exploração, divergência e questionamento. Generates hipóteses que eliminas. Produces ângulos que te fazem pensar em ângulos melhores. Pedes à IA para criticar o teu rascunho.<br><br><strong>O output final é teu — o processo foi acelerado e enriquecido pela IA.</strong></p>
+      </div>
+      <div class="card">
+        <h4>IA como processo</h4>
+        <p>A IA produz o output final com intervenção mínima tua. Eficiente para conteúdo de volume, para tarefas repetitivas com critérios claros, para primeiras versões que alguém vai rever.<br><br><strong>Problemático quando aplicado indiscriminadamente a trabalho que requer julgamento criativo.</strong></p>
+      </div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>IA no processo — quando a usas como ferramenta de exploração, divergência e questionamento antes de chegares ao output final. Generates hipóteses que eliminas. Produces ângulos que te fazem pensar em ângulos melhores. Pedes à IA para criticar o teu rascunho, para identificar os pontos fracos do teu argumento, para sugerir o que falta. O output final é teu — o processo foi acelerado e enriquecido pela IA.</p>
+      <p>IA como processo — quando a IA produz o output final com intervenção mínima tua. Eficiente para conteúdo de volume, para tarefas repetitivas com critérios claros, para primeiras versões que alguém vai rever. Problemático quando aplicado indiscriminadamente a trabalho que requer julgamento criativo e estratégico.</p>
+      <p>A questão não é qual é o modo certo. É usar deliberadamente o modo certo para cada tarefa.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 30 · QUANDO USAR CADA MODO
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="6">
+    <div class="eyebrow">Quando usar cada modo</div>
+    <h2>A questão não é qual<br>é o modo certo.</h2>
+    <div class="sp" style="height:22px"></div>
+    <div class="g2" style="max-width:820px;">
+      <div class="card ac">
+        <h4>IA no processo — quando:</h4>
+        <p>• Trabalho com consequências estratégicas significativas<br>
+        • Originalidade e ponto de vista são critérios centrais<br>
+        • Contexto cultural específico é crítico<br>
+        • O trabalho vai ser associado publicamente à marca</p>
+      </div>
+      <div class="card">
+        <h4>IA como processo — quando:</h4>
+        <p>• Volume é o objetivo — variações, adaptações, traduções<br>
+        • Critérios de qualidade são claros e verificáveis<br>
+        • É um primeiro rascunho que vai ser revisto<br>
+        • A tarefa é repetitiva e a variação de qualidade é baixa</p>
+      </div>
+    </div>
+    <div class="sp" style="height:16px"></div>
+    <div class="hl" style="max-width:720px; font-size:13px;">
+      O erro mais comum é aplicar o segundo modo onde deveria estar o primeiro. Não por má intenção — por eficiência mal aplicada.
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>IA no processo faz sentido quando o trabalho tem consequências estratégicas significativas — um posicionamento de marca, uma campanha de lançamento, um manifesto. Quando a originalidade e o ponto de vista são critérios centrais de sucesso. Quando o contexto cultural específico é crítico e não está explicitamente nos dados de treino.</p>
+      <p>IA como processo faz sentido quando o volume é o objetivo — variações de copy para testes A/B, adaptações para diferentes formatos, traduções. Quando os critérios de qualidade são claros e verificáveis. Quando é um primeiro rascunho que vai ser revisto e editado por um profissional.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 31 · CASOS REAIS — MAL
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="6">
+    <div class="eyebrow">Casos reais · O que correu mal</div>
+    <h2>Três lições do campo.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="g3">
+      <div class="cc red">
+        <div class="tag red">Coca-Cola · 2024</div>
+        <h4>Uncanny valley emocional</h4>
+        <p>Recriou o clássico anúncio de Natal com IA. Tecnicamente impressionante, amplamente criticado — <strong>quase certo, mas de uma forma que os espectadores sentiam sem conseguir articular.</strong> Autenticidade emocional não se gera, constrói-se.</p>
+      </div>
+      <div class="cc red">
+        <div class="tag red">Air Canada · Tribunal</div>
+        <h4>Responsabilidade legal</h4>
+        <p>Chatbot garantiu a um cliente uma política de reembolso que não existia. A empresa argumentou que "o chatbot era uma entidade separada." <strong>O tribunal canadiano não concordou.</strong> A Air Canada pagou.</p>
+      </div>
+      <div class="cc red">
+        <div class="tag red">Gartner · Múltiplos casos</div>
+        <h4>Factos inventados com confiança</h4>
+        <p>Marcas publicaram conteúdo com datas de fundação erradas, estatísticas inexistentes, citações de pessoas que nunca disseram o que lhes era atribuído. <strong>O texto soava profissional.</strong> Só verificação independente os detetava.</p>
+      </div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>A Coca-Cola usou IA generativa para recriar o clássico anúncio de Natal "Holidays Are Coming" em 2024. O resultado foi tecnicamente impressionante e amplamente criticado — não porque fosse mau, mas porque era uncanny valley: quase certo, mas de uma forma que os espectadores sentiam sem conseguir articular. Parecia artificial precisamente porque tentava parecer real.</p>
+      <p>A Air Canada implementou um chatbot de IA que garantiu a um cliente uma política de reembolso que não existia. Quando o cliente tentou beneficiar da política, a empresa recusou, argumentando que o chatbot era "uma entidade separada" responsável pelos próprios erros. O tribunal canadiano não concordou. A Air Canada pagou.</p>
+      <p>A Gartner documentou múltiplos casos de marcas que publicaram conteúdo gerado por IA que incluía factos inventados com total confiança — datas de fundação erradas, estatísticas inexistentes, citações de pessoas que nunca disseram o que lhes era atribuído. Em todos os casos, o texto soava profissional e não havia sinais linguísticos de incorreção.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 32 · CASOS REAIS — BEM
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="6">
+    <div class="eyebrow">Casos reais · O que correu bem</div>
+    <h2>Criatividade humana<br>a usar insights da IA.</h2>
+    <div class="sp" style="height:22px"></div>
+    <div class="g2" style="max-width:820px;">
+      <div class="cc grn">
+        <div class="tag grn">Heinz</div>
+        <h4>O insight que a IA revelou</h4>
+        <p>Pediram à IA para gerar imagens de "ketchup" sem dar mais instruções. Em todos os modelos testados, a IA gerou consistentemente imagens semelhantes às garrafas icónicas da Heinz — sem que nenhum humano tivesse mencionado a marca.</p>
+        <p style="margin-top:8px;"><strong>Usaram isso como campanha:</strong> a prova de que quando se pensa em ketchup, pensa-se em Heinz. Criatividade humana a transformar um insight gerado pela IA.</p>
+      </div>
+      <div class="cc grn">
+        <div class="tag grn">Agências</div>
+        <h4>Investigação em horas, não dias</h4>
+        <p>Várias agências reportam resultados significativos na fase de pesquisa e síntese — reduzindo de dias para horas o tempo de investigação de audiência, análise de concorrência, e síntese de feedback qualitativo.</p>
+        <p style="margin-top:8px;">Não porque a IA substitua o pensamento — mas porque <strong>remove o trabalho de volume que precede o pensamento.</strong></p>
+      </div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>A Heinz pediu à IA para gerar imagens de "ketchup" sem dar mais instruções. Em todos os modelos testados, a IA gerou consistentemente imagens que se assemelhavam às garrafas icónicas da Heinz — sem que nenhum humano tivesse mencionado a marca. Usaram isso como campanha: a prova de que quando se pensa em ketchup, pensa-se em Heinz. Criatividade humana a usar um insight gerado pela IA.</p>
+      <p>Várias agências reportam resultados significativos na fase de pesquisa e síntese — reduzindo de dias para horas o tempo de investigação de audiência, análise de concorrência, e síntese de feedback qualitativo. Não porque a IA substitua o pensamento — mas porque remove o trabalho de volume que precede o pensamento.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 33 · PARA TERMINAR
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="6">
+    <div class="eyebrow">Para terminar</div>
+    <h2 style="max-width:700px; font-size:clamp(26px,3.8vw,46px);">
+      A IA amplifica o que<br>trazeres para ela.
+    </h2>
+    <div class="sp" style="height:28px"></div>
+    <div class="hl" style="font-size:clamp(14px,1.7vw,18px); max-width:680px; text-align:left;">
+      Traz pensamento claro e trabalhas com a melhor ferramenta da história.<br>
+      Traz preguiça intelectual e produzirás o conteúdo mais eficientemente mediano que alguma vez existiu.
+    </div>
+    <div class="sp" style="height:24px"></div>
+    <p style="text-align:center; max-width:600px;">
+      O valor não está mais em conseguir produzir. Está em saber <strong>o que produzir, porquê, para quem</strong>, e com que ponto de vista.<br><br>
+      <strong>A escolha é tua — e é feita de novo a cada prompt.</strong>
+    </p>
+    <div class="snotes" style="display:none;">
+      <p>A IA não vai tornar os bons profissionais de marketing obsoletos. Vai tornar os bons profissionais de marketing mais produtivos — e vai tornar os profissionais medíocres irrelevantes, porque a mediocridade deixou de ser escassa.</p>
+      <p>O que isto significa na prática: o valor não está mais em conseguir produzir. Está em saber o que produzir, porquê, para quem, e com que ponto de vista. Está no julgamento, no contexto, na intenção estratégica. Está nas perguntas que fazes antes de ligar a ferramenta.</p>
+      <p>Essas competências não as dá a IA. São construídas com experiência, com exposição a trabalho bom e mau, com a prática de articular porquê algo funciona e porquê algo não funciona. Com curiosidade mantida ao longo do tempo sobre o comportamento humano, sobre cultura, sobre o que move as pessoas.</p>
+      <p>A IA é a ferramenta mais poderosa que a profissão de marketing alguma vez teve. Como todas as ferramentas poderosas, amplifica o que trazeres para ela. Traz pensamento claro e trabalha com a melhor ferramenta da história. Traz preguiça intelectual e produzirás o conteúdo mais eficientemente mediano que alguma vez existiu. A escolha é tua — e é feita de novo a cada prompt.</p>
+    </div>
+  </div>
+
+</div><!-- /#deck -->
+
+<!-- notes panel -->
+<div id="notesPanel">
+  <div id="notesPanelHeader">
+    <span>Notas do apresentador</span>
+    <button id="notesPanelClose" onclick="toggleNotes()">fechar ×</button>
+  </div>
+  <div id="notesContent"></div>
+</div>
+
+<!-- nav bar -->
+<nav id="nav">
+  <button class="nbtn" id="btnPrev" onclick="go(-1)" title="← Anterior">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+      <path d="M8.5 10.5L4.5 6.5L8.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <span id="counter">1 / 33</span>
+  <button class="nbtn" id="btnNext" onclick="go(1)" title="→ Seguinte">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+      <path d="M4.5 2.5L8.5 6.5L4.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</nav>
+
+<script>
+  const slides    = Array.from(document.querySelectorAll('#deck .slide'));
+  const total     = slides.length;
+  let   cur       = 0;
+  let   animating = false;
+  let   notesOpen = false;
+
+  function goTo(n) {
+    if (animating || n === cur) return;
+    n = Math.max(0, Math.min(n, total - 1));
+
+    animating = true;
+    slides[cur].classList.add('exit');
+    slides[cur].classList.remove('active');
+
+    const prev = cur;
+    cur = n;
+
+    slides[cur].classList.add('active');
+    slides[cur].classList.remove('exit');
+
+    setTimeout(() => {
+      slides[prev].classList.remove('exit');
+      animating = false;
+    }, 420);
+
+    document.getElementById('counter').textContent = `${cur + 1} / ${total}`;
+    document.getElementById('progress').style.width = `${((cur + 1) / total) * 100}%`;
+
+    const b = slides[cur].dataset.b;
+    document.querySelectorAll('.bpip').forEach(p =>
+      p.classList.toggle('on', p.dataset.b === b)
+    );
+
+    document.getElementById('btnPrev').disabled = cur === 0;
+    document.getElementById('btnNext').disabled = cur === total - 1;
+
+    if (notesOpen) updateNotesContent();
+  }
+
+  function go(dir) { goTo(cur + dir); }
+
+  /* ── Notes ── */
+  function toggleNotes() {
+    notesOpen = !notesOpen;
+    document.getElementById('notesPanel').classList.toggle('open', notesOpen);
+    document.getElementById('notesBtn').classList.toggle('active', notesOpen);
+    if (notesOpen) updateNotesContent();
+  }
+
+  function updateNotesContent() {
+    const notesEl = slides[cur].querySelector('.snotes');
+    const content = document.getElementById('notesContent');
+    if (notesEl && notesEl.innerHTML.trim()) {
+      content.innerHTML = notesEl.innerHTML;
+    } else {
+      content.innerHTML = '<p style="color:var(--muted); font-style:italic;">(sem notas para este slide)</p>';
+    }
+  }
+
+  /* ── Keyboard ── */
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight', 'ArrowDown', ' '].includes(e.key)) { e.preventDefault(); go(1); }
+    if (['ArrowLeft', 'ArrowUp'].includes(e.key))         { e.preventDefault(); go(-1); }
+    if (e.key === 'n' || e.key === 'N')                   { e.preventDefault(); toggleNotes(); }
+    if (e.key === 'Escape' && notesOpen)                  { toggleNotes(); }
+  });
+
+  /* ── Touch / Swipe ── */
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const d = tx - e.changedTouches[0].clientX;
+    if (Math.abs(d) > 48) go(d > 0 ? 1 : -1);
+  });
+
+  /* ── Click slide to advance ── */
+  document.getElementById('deck').addEventListener('click', e => {
+    if (!e.target.closest('#nav') && !e.target.closest('#notesPanel')) go(1);
+  });
+
+  /* ── Init ── */
+  goTo(0);
+  document.getElementById('btnPrev').disabled = true;
+</script>
+</body>
+</html>
