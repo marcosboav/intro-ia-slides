@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IA Aplicada ao Marketing · Aula 3 · Março 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #08080f;
+      --surface:  #111120;
+      --surface2: #17172a;
+      --border:   rgba(255,255,255,0.07);
+      --text:     #eeeeff;
+      --muted:    rgba(238,238,255,0.45);
+      --accent:   #6e56cf;
+      --accent2:  #9e8cfc;
+      --accent3:  #c4b5fd;
+      --green:    #4ade80;
+      --orange:   #fb923c;
+      --red:      #f87171;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── ambient glows ─── */
+    .glow { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+    .glow::before {
+      content: ''; position: absolute; top: -15%; left: -10%;
+      width: 55%; height: 55%;
+      background: radial-gradient(ellipse, rgba(110,86,207,.10) 0%, transparent 70%);
+    }
+    .glow::after {
+      content: ''; position: absolute; bottom: -15%; right: -5%;
+      width: 45%; height: 45%;
+      background: radial-gradient(ellipse, rgba(158,140,252,.07) 0%, transparent 70%);
+    }
+
+    /* ─── progress bar ─── */
+    #progress {
+      position: fixed; top: 0; left: 0; height: 2px; width: 0;
+      background: linear-gradient(90deg, var(--accent), var(--accent3));
+      transition: width .35s ease; z-index: 300;
+    }
+
+    /* ─── block indicator ─── */
+    #blocks {
+      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 6px; z-index: 200;
+    }
+    .bpip { height: 3px; border-radius: 2px; background: var(--border); transition: background .3s, width .3s; }
+    .bpip.on { background: var(--accent2); }
+
+    /* ─── notes button ─── */
+    #notesBtn {
+      position: fixed; top: 18px; right: 20px; z-index: 200;
+      background: rgba(17,17,32,.85); backdrop-filter: blur(14px);
+      border: 1px solid var(--border); border-radius: 20px;
+      padding: 5px 13px 5px 10px; color: var(--muted);
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: all .2s; font-family: inherit; letter-spacing: .04em;
+      display: flex; align-items: center; gap: 6px;
+    }
+    #notesBtn:hover { border-color: rgba(110,86,207,.5); color: var(--text); }
+    #notesBtn.active { background: rgba(110,86,207,.15); border-color: rgba(110,86,207,.4); color: var(--accent2); }
+    #notesBtn svg { opacity: .6; }
+    #notesBtn.active svg { opacity: 1; }
+
+    /* ─── notes panel ─── */
+    #notesPanel {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      max-height: 40vh;
+      background: rgba(6,6,14,.97); backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(110,86,207,.22);
+      transform: translateY(100%); transition: transform .35s ease;
+      z-index: 149; display: flex; flex-direction: column;
+    }
+    #notesPanel.open { transform: translateY(0); }
+    #notesPanelHeader {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 10vw; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #notesPanelHeader span {
+      font-size: 10px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--accent2);
+    }
+    #notesPanelClose {
+      background: none; border: 1px solid var(--border); color: var(--muted);
+      cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 8px;
+      border-radius: 4px; transition: all .2s; font-family: inherit;
+    }
+    #notesPanelClose:hover { border-color: rgba(110,86,207,.4); color: var(--text); }
+    #notesContent {
+      overflow-y: auto; padding: 16px 10vw 72px; flex: 1;
+      scrollbar-width: thin; scrollbar-color: rgba(110,86,207,.3) transparent;
+    }
+    #notesContent p {
+      font-size: 13.5px; line-height: 1.8; color: rgba(238,238,255,.62);
+      max-width: 820px; margin-bottom: 12px;
+    }
+    #notesContent p:last-child { margin-bottom: 0; }
+
+    /* ─── nav ─── */
+    #nav {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(17,17,32,.85); backdrop-filter: blur(14px);
+      border: 1px solid var(--border); border-radius: 40px;
+      padding: 7px 14px; z-index: 200;
+    }
+    .nbtn {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s;
+    }
+    .nbtn:hover { background: rgba(110,86,207,.18); border-color: rgba(110,86,207,.5); color: var(--text); }
+    .nbtn:disabled { opacity: .3; cursor: default; }
+    #counter { font-size: 12px; color: var(--muted); font-weight: 500; min-width: 52px; text-align: center; }
+
+    /* ─── slides container ─── */
+    #deck { position: relative; width: 100vw; height: 100vh; z-index: 1; }
+
+    /* ─── individual slide ─── */
+    .slide {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: flex-start;
+      padding: 80px 10vw;
+      opacity: 0; transform: translateY(18px);
+      transition: opacity .4s ease, transform .4s ease;
+      pointer-events: none;
+    }
+    .slide.active { opacity: 1; transform: translateY(0); pointer-events: all; }
+    .slide.exit   { opacity: 0; transform: translateY(-18px); }
+    .slide.center { align-items: center; text-align: center; }
+
+    /* ─── type scale ─── */
+    .eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--accent2);
+      display: flex; align-items: center; gap: 8px; margin-bottom: 18px;
+    }
+    .eyebrow::before {
+      content: ''; display: block; width: 18px; height: 1px;
+      background: var(--accent2); flex-shrink: 0;
+    }
+    .slide.center .eyebrow { justify-content: center; }
+    .slide.center .eyebrow::before { display: none; }
+
+    h1 {
+      font-size: clamp(46px, 7.5vw, 88px);
+      font-weight: 800; line-height: 1.02; letter-spacing: -.035em;
+      background: linear-gradient(140deg, #fff 0%, var(--accent3) 55%, var(--accent) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    h2 {
+      font-size: clamp(28px, 4vw, 52px);
+      font-weight: 700; line-height: 1.1; letter-spacing: -.025em;
+    }
+    .lead {
+      font-size: clamp(17px, 2.2vw, 26px);
+      font-weight: 300; line-height: 1.55; color: rgba(238,238,255,.8);
+      max-width: 640px; margin-top: 20px;
+    }
+    p {
+      font-size: clamp(14px, 1.6vw, 18px);
+      line-height: 1.7; color: rgba(238,238,255,.7); max-width: 680px;
+    }
+    p strong { color: var(--text); font-weight: 600; }
+    p + p { margin-top: 14px; }
+
+    .sp { display: block; }
+
+    /* ─── quote ─── */
+    .quote {
+      border-left: 2px solid var(--accent); padding-left: 24px;
+      font-size: clamp(19px, 2.4vw, 28px); font-style: italic;
+      color: rgba(238,238,255,.85); line-height: 1.55; max-width: 760px;
+    }
+
+    /* ─── highlight box ─── */
+    .hl {
+      background: rgba(110,86,207,.1); border: 1px solid rgba(110,86,207,.28);
+      border-radius: 10px; padding: 16px 20px;
+      font-size: clamp(13px, 1.5vw, 16px); color: var(--accent3); line-height: 1.6; max-width: 700px;
+    }
+    .hl strong { color: #fff; }
+
+    /* ─── card ─── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
+    .card.ac { border-color: rgba(110,86,207,.3); background: rgba(110,86,207,.08); }
+    .card p { max-width: none; }
+    .card h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+
+    /* ─── debate card ─── */
+    .debate {
+      background: rgba(251,146,60,.07); border: 1px solid rgba(251,146,60,.25);
+      border-radius: 14px; padding: 32px 36px; max-width: 740px;
+      font-size: clamp(15px, 1.9vw, 21px); line-height: 1.7; color: rgba(238,238,255,.88);
+    }
+    .debate strong { color: var(--orange); }
+
+    /* ─── list ─── */
+    .list { display: flex; flex-direction: column; gap: 14px; max-width: 720px; }
+    .li {
+      display: flex; align-items: flex-start; gap: 14px;
+      font-size: clamp(14px, 1.6vw, 18px); color: rgba(238,238,255,.78); line-height: 1.55;
+    }
+    .dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); margin-top: 8px; }
+    .dot.g { background: var(--green); }
+    .dot.o { background: var(--orange); }
+    .dot.r { background: var(--red); }
+    .li strong { color: var(--text); }
+
+    /* ─── numbered list ─── */
+    .nlist { display: flex; flex-direction: column; gap: 16px; max-width: 720px; }
+    .nli { display: flex; align-items: flex-start; gap: 16px; font-size: clamp(14px, 1.6vw, 18px); color: rgba(238,238,255,.78); line-height: 1.55; }
+    .nnum { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: rgba(110,86,207,.25); border: 1px solid rgba(110,86,207,.4); color: var(--accent2); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+    .nli strong { color: var(--text); }
+
+    /* ─── grid helpers ─── */
+    .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; max-width: 860px; }
+    .g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; max-width: 860px; }
+    .g2 .card p, .g3 .card p { font-size: 14px; color: var(--muted); max-width: none; }
+    .g2 .card strong, .g3 .card strong { color: var(--text); }
+
+    /* ─── stat ─── */
+    .stat { text-align: center; }
+    .sn {
+      font-size: clamp(34px, 5vw, 58px); font-weight: 800; letter-spacing: -.03em;
+      background: linear-gradient(135deg, var(--accent3), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1;
+    }
+    .sl { font-size: 12px; color: var(--muted); font-weight: 500; margin-top: 6px; line-height: 1.4; }
+
+    /* ─── company cards ─── */
+    .cc { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; }
+    .cc h4 { font-size: 15px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .cc p { font-size: 13px; color: var(--muted); max-width: none; line-height: 1.55; }
+    .cc p strong { color: var(--text); }
+    .cc.pur { border-color: rgba(110,86,207,.35); }
+    .cc.grn { border-color: rgba(74,222,128,.3); }
+    .cc.org { border-color: rgba(251,146,60,.3); }
+    .cc.red { border-color: rgba(248,113,113,.3); }
+
+    /* ─── orange/green stat variants ─── */
+    .sn.org {
+      background: linear-gradient(135deg, #fff, var(--orange));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .sn.grn {
+      background: linear-gradient(135deg, #fff, var(--green));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    /* ─── tag ─── */
+    .tag {
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .07em;
+      text-transform: uppercase; padding: 3px 8px; border-radius: 4px; margin-bottom: 6px;
+    }
+    .tag.pur { background: rgba(110,86,207,.2); color: var(--accent2); }
+    .tag.org { background: rgba(251,146,60,.15); color: var(--orange); }
+    .tag.grn { background: rgba(74,222,128,.15); color: var(--green); }
+    .tag.red { background: rgba(248,113,113,.15); color: var(--red); }
+
+    /* ─── prompt box ─── */
+    .prompt-box {
+      background: rgba(110,86,207,.06); border: 1px solid rgba(110,86,207,.22);
+      border-radius: 10px; padding: 18px 22px; max-width: 740px; width: 100%;
+      font-family: 'Inter', monospace; font-size: 13px; line-height: 1.7;
+      color: rgba(238,238,255,.72); white-space: pre-wrap;
+    }
+    .prompt-box strong { color: var(--accent3); font-weight: 600; }
+
+    /* ─── tools grid ─── */
+    .tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; max-width: 860px; }
+    .tools-grid .card h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent2); margin-bottom: 10px; }
+    .tools-grid .card p { font-size: 12.5px; line-height: 1.6; color: var(--muted); max-width: none; }
+
+    @media (max-width: 700px) {
+      .slide { padding: 60px 6vw; }
+      .g2, .g3, .tools-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="glow"></div>
+<div id="progress"></div>
+
+<!-- block pips -->
+<div id="blocks">
+  <div class="bpip on" style="width:24px" data-b="0"></div>
+  <div class="bpip"    style="width:54px" data-b="1"></div>
+  <div class="bpip"    style="width:54px" data-b="2"></div>
+  <div class="bpip"    style="width:54px" data-b="3"></div>
+  <div class="bpip"    style="width:40px" data-b="4"></div>
+  <div class="bpip"    style="width:24px" data-b="5"></div>
+</div>
+
+<!-- notes toggle button -->
+<button id="notesBtn" onclick="toggleNotes()" title="Notas do apresentador · tecla N">
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+    <rect x="1.5" y="1.5" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+    <path d="M4 4.5h5M4 6.5h5M4 8.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+  </svg>
+  NOTAS
+</button>
+
+<div id="deck">
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 01 · COVER
+  ══════════════════════════════════════════ -->
+  <div class="slide center active" data-b="0">
+    <div class="eyebrow">Março 2026 · Aula 3</div>
+    <h1>IA &amp; SEO</h1>
+    <p class="lead" style="text-align:center;">O SEO transformou-se.<br>A IA é a causa e a ferramenta.</p>
+    <div class="snotes" style="display:none;">
+      <p>Antes de abrir uma ferramenta, a turma precisa de perceber que o SEO de 2026 não é o SEO que aprenderam nas aulas introdutórias. A mecânica base é a mesma — conteúdo, autoridade, técnica — mas o campo de jogo mudou de forma fundamental e quem não percebe isso vai otimizar para um mundo que já não existe.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 02 · ESTRUTURA DA AULA
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="0">
+    <div class="eyebrow">Estrutura da aula</div>
+    <h2>O que vamos cobrir.</h2>
+    <div class="sp" style="height:24px"></div>
+    <div class="nlist" style="align-items:center; text-align:left;">
+      <div class="nli"><span class="nnum">0</span><span><strong>O elefante na sala</strong> — como o SEO mudou · 15 min</span></div>
+      <div class="nli"><span class="nnum">1</span><span><strong>Pesquisa de keywords com IA</strong> · 30 min</span></div>
+      <div class="nli"><span class="nnum">2</span><span><strong>Auditoria técnica com IA</strong> · 25 min</span></div>
+      <div class="nli"><span class="nnum">3</span><span><strong>Conteúdo para AI Overviews — GEO</strong> · 30 min</span></div>
+      <div class="nli"><span class="nnum">4</span><span><strong>Análise e estratégia com IA</strong> · 15 min</span></div>
+      <div class="nli"><span class="nnum">5</span><span><strong>Fechar</strong> — o que levas para amanhã · 5 min</span></div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>A estrutura desta aula é deliberadamente prática. Cada bloco combina teoria breve com demonstração ao vivo e exercício. O objetivo é que cada pessoa saia com workflows concretos que pode aplicar amanhã.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 03 · AI OVERVIEWS — NÚMEROS
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="0">
+    <div class="eyebrow">O elefante na sala</div>
+    <h2>Os números que<br>mudaram tudo.</h2>
+    <div class="sp" style="height:28px"></div>
+    <div class="g3">
+      <div class="stat">
+        <div class="sn org">50%+</div>
+        <div class="sl">das pesquisas Google<br>têm AI Overviews</div>
+      </div>
+      <div class="stat">
+        <div class="sn" style="background:linear-gradient(135deg,#fff,var(--red));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">−58%</div>
+        <div class="sl">CTR do 1.º resultado<br>quando há AI Overview</div>
+      </div>
+      <div class="stat">
+        <div class="sn" style="background:linear-gradient(135deg,#fff,var(--red));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">83%</div>
+        <div class="sl">pesquisas sem clique<br>com AI Overview</div>
+      </div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Os AI Overviews do Google aparecem em mais de 50% de todas as pesquisas. Não é uma funcionalidade de nicho. É a experiência padrão para metade de tudo o que as pessoas pesquisam.</p>
+      <p>Quando um AI Overview aparece, o CTR do primeiro resultado orgânico cai 58%. O site que está em primeiro lugar recebe quase metade dos cliques que recebia antes.</p>
+      <p>O zero-click é a consequência direta. Atualmente 58 a 60% de todas as pesquisas no Google terminam sem nenhum clique. Quando existe um AI Overview, esse número sobe para 83%.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 04 · NOVO OBJETIVO
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="0">
+    <div class="eyebrow">Mudança de paradigma</div>
+    <h2>O novo objetivo é<br>ser a fonte que<br>a IA cita.</h2>
+    <div class="sp" style="height:20px"></div>
+    <p>Não o link que o utilizador clica — <strong>a autoridade que a IA decide incluir na sua resposta.</strong></p>
+    <p>É uma mudança de paradigma, não uma otimização incremental.</p>
+    <div class="snotes" style="display:none;">
+      <p>Se o objetivo do SEO era aparecer nos primeiros resultados para receber cliques, e agora os cliques estão a desaparecer, qual é o novo objetivo? A resposta é: o novo objetivo é ser a fonte que a IA cita. Não o link que o utilizador clica — a autoridade que a IA decide incluir na sua resposta.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 05 · A BOA NOTÍCIA
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="0">
+    <div class="eyebrow">A boa notícia</div>
+    <h2>Menos cliques,<br>melhor qualidade.</h2>
+    <div class="sp" style="height:28px"></div>
+    <div class="g2" style="max-width:520px;">
+      <div class="stat">
+        <div class="sn grn">+35%</div>
+        <div class="sl">cliques orgânicos para<br>marcas citadas em AI Overviews</div>
+      </div>
+      <div class="stat">
+        <div class="sn grn">+91%</div>
+        <div class="sl">cliques pagos para<br>marcas citadas em AI Overviews</div>
+      </div>
+    </div>
+    <div class="sp" style="height:24px"></div>
+    <div class="hl" style="max-width:620px;">
+      Os utilizadores que ainda clicam são <strong>mais intencionais, mais qualificados</strong>, e convertem melhor. A quantidade caiu. A qualidade subiu.
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Marcas citadas nos AI Overviews recebem 35% mais cliques orgânicos e 91% mais cliques pagos do que marcas que não são citadas. Os utilizadores que ainda clicam depois de ver um AI Overview são mais intencionais, mais qualificados, e convertem melhor.</p>
+      <p>Então o SEO não morreu — transformou-se. E a IA é simultaneamente a causa dessa transformação e a melhor ferramenta para navegar nela.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 06 · BLOCO 1 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="1">
+    <div class="eyebrow">Bloco 1 · Keywords</div>
+    <h1>Pesquisa de<br>keywords<br>com IA.</h1>
+    <p class="lead" style="text-align:center;">Demo ao vivo + exercício<br>30 minutos</p>
+    <div class="snotes" style="display:none;">
+      <p>A IA não tem dados de volume em tempo real, mas é extraordinária a mapear o espaço semântico em torno de um tópico — as variações, as intenções, as entidades relacionadas que o Google espera ver num conteúdo sobre esse tema.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 07 · PROMPT 1 — EXPANSÃO SEMÂNTICA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Demo · Prompt 1</div>
+    <h2>Expansão semântica.</h2>
+    <div class="sp" style="height:16px"></div>
+    <div class="prompt-box">"Age como um especialista em SEO. O meu negócio é <strong>[descreve brevemente]</strong>.
+A minha keyword principal é '<strong>[keyword]</strong>'.
+
+Gera 30 variações long-tail agrupadas por intenção de pesquisa:
+- Informacional (o utilizador quer aprender)
+- Comercial (o utilizador está a comparar opções)
+- Transacional (o utilizador quer comprar/contactar)
+
+Para cada grupo, identifica 3 entidades semânticas que o conteúdo
+deve incluir para ser considerado completo por um motor de pesquisa com IA.
+
+Formata como tabela."</div>
+    <div class="snotes" style="display:none;">
+      <p>Abre o Claude ou ChatGPT no projetor. Usa a marca que escolheste. Este prompt demonstra como a IA mapeia o espaço semântico — variações, intenções, entidades relacionadas — mesmo sem dados de volume em tempo real.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 08 · PROMPT 2 — ESTRUTURA DE TÓPICOS
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Demo · Prompt 2</div>
+    <h2>Arquitectura de<br>conteúdo.</h2>
+    <div class="sp" style="height:16px"></div>
+    <div class="prompt-box">"Cria uma estrutura de tópicos para um site sobre <strong>[nicho]</strong>.
+Define 4 páginas pilar.
+Para cada página pilar, propõe 5 artigos de suporte com:
+- Título sugerido
+- Keyword principal
+- Intenção de pesquisa
+- Uma frase explicando como suporta a página pilar
+
+Organiza hierarquicamente com indicação de linking interno."</div>
+    <div class="sp" style="height:14px"></div>
+    <div class="hl" style="font-size:13px;">
+      <strong>O que a IA faz que ferramentas tradicionais não fazem:</strong> pensa na arquitectura de conteúdo como um sistema coerente, não como uma lista de keywords independentes.
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Este prompt demonstra algo que as ferramentas de keyword research tradicionais não fazem bem: pensar na arquitectura de conteúdo como um sistema coerente, não como uma lista de keywords independentes.</p>
+      <p>Depois de correr este prompt, mostra o Ahrefs Free Keyword Generator — pesquisa a keyword seed e verifica se os resultados se complementam com o que a IA gerou. A IA deu a estrutura semântica. O Ahrefs dá indicações de volume e dificuldade. Juntos cobrem o que um profissional com Semrush pago faria.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 09 · EXERCÍCIO BLOCO 1
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="1">
+    <div class="eyebrow">Exercício · 20 min</div>
+    <h2>Escolhe uma marca real.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="nlist">
+      <div class="nli"><span class="nnum">1</span><span><strong>Define uma keyword seed</strong> para essa marca — 5 min de reflexão, sem IA</span></div>
+      <div class="nli"><span class="nnum">2</span><span><strong>Usa o Prompt 1</strong> para expandir semanticamente a keyword — 8 min</span></div>
+      <div class="nli"><span class="nnum">3</span><span><strong>Avalia o output:</strong> assinala 3 keywords que usaria e 1 que não faz sentido — 5 min</span></div>
+      <div class="nli"><span class="nnum">4</span><span><strong>Escreve uma frase</strong> explicando porque a descartaste — o que a IA não sabia sobre a marca — 2 min</span></div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Individualmente. Cada pessoa escolhe uma marca real — um cliente actual, o negócio onde trabalha, ou uma marca que conhece bem. O passo 4 é o mais importante: treina o julgamento sobre quando aceitar e quando rejeitar sugestões da IA.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 10 · BLOCO 2 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="2">
+    <div class="eyebrow">Bloco 2 · Auditoria</div>
+    <h1>Auditoria<br>técnica<br>com IA.</h1>
+    <p class="lead" style="text-align:center;">Demo ao vivo + exercício<br>25 minutos</p>
+    <div class="snotes" style="display:none;">
+      <p>O objetivo não é fazer uma auditoria completa — é mostrar que a IA comprime dramaticamente o tempo de diagnóstico. O que antes levava uma tarde pode levar 20 minutos.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 11 · ANÁLISE DE PÁGINA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">Demo · Análise on-page</div>
+    <h2>Diagnóstico em<br>minutos, não horas.</h2>
+    <div class="sp" style="height:16px"></div>
+    <div class="prompt-box">"Vou partilhar o conteúdo HTML/texto de uma página web.
+Analisa-a do ponto de vista de SEO técnico e on-page e identifica:
+1. <strong>Problemas críticos</strong> (que afectam directamente o ranking)
+2. <strong>Problemas moderados</strong> (que limitam o potencial)
+3. <strong>Oportunidades de melhoria</strong>
+
+Para cada problema, indica o impacto estimado e a solução específica.
+
+Inclui análise de: título, meta description, headers H1-H3,
+estrutura de conteúdo, densidade semântica, e dados estruturados."</div>
+    <div class="snotes" style="display:none;">
+      <p>Abre o ChatGPT com browsing activado (versão Plus) ou usa Claude com o texto da página copiado. Mostra como em 5 minutos se obtém uma análise que antes levava uma tarde.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 12 · SCHEMA MARKUP
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">Demo · Schema Markup</div>
+    <h2>Structured data<br>em 2026.</h2>
+    <div class="sp" style="height:16px"></div>
+    <div class="prompt-box">"Gera o schema markup JSON-LD para uma página de <strong>[tipo de negócio]</strong> com:
+- Nome: <strong>[nome]</strong>
+- Morada: <strong>[morada]</strong>
+- Telefone: <strong>[telefone]</strong>
+- Horário: <strong>[horário]</strong>
+- Descrição: <strong>[descrição]</strong>
+- Rating: <strong>[valor]</strong> com base em <strong>[número]</strong> reviews
+
+Inclui os tipos: LocalBusiness, Organization e BreadcrumbList.
+Valida mentalmente se está correcto antes de gerar."</div>
+    <div class="sp" style="height:14px"></div>
+    <div class="hl" style="font-size:13px;">
+      Os AI Overviews usam structured data para compreender e citar negócios locais. <strong>Um site sem schema correcto é literalmente invisível</strong> para certas categorias de pesquisa com AI Overview.
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Este é um dos casos de uso técnicos mais concretos e imediatamente úteis. O schema markup é crítico em 2026 porque os AI Overviews e os sistemas de pesquisa com IA usam structured data para compreender e citar negócios locais.</p>
+      <p>Mostra como validar o output em Google Rich Results Test — cola o JSON gerado e vê se passa a validação. Este ciclo de geração → validação → correção é o fluxo de trabalho real.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 13 · EXERCÍCIO BLOCO 2
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="2">
+    <div class="eyebrow">Exercício · 15 min</div>
+    <h2>Audita a marca<br>que escolheste.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="nlist">
+      <div class="nli"><span class="nnum">1</span><span><strong>PageSpeed Insights</strong> — analisa a homepage, tira nota dos Core Web Vitals — 5 min</span></div>
+      <div class="nli"><span class="nnum">2</span><span><strong>Copia o texto visível</strong> da homepage → cola no Claude/ChatGPT com o prompt acima — 8 min</span></div>
+      <div class="nli"><span class="nnum">3</span><span><strong>Identifica o problema mais crítico</strong> — escreve uma frase sobre o que farias primeiro — 2 min</span></div>
+    </div>
+    <div class="sp" style="height:16px"></div>
+    <div class="hl" style="font-size:13px;">
+      O objetivo não é fazer uma auditoria completa em 15 minutos — é mostrar que a <strong>IA comprime dramaticamente o tempo de diagnóstico.</strong>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Cada pessoa usa o URL do site da marca que escolheu no bloco anterior. O objetivo não é fazer uma auditoria completa em 15 minutos — é mostrar que a IA comprime dramaticamente o tempo de diagnóstico. O que antes levava uma tarde pode levar 20 minutos.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 14 · BLOCO 3 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="3">
+    <div class="eyebrow">Bloco 3 · GEO</div>
+    <h1>Conteúdo para<br>AI Overviews.</h1>
+    <p class="lead" style="text-align:center;">Generative Engine Optimization<br>O novo SEO que a maioria ainda não conhece.</p>
+    <div class="snotes" style="display:none;">
+      <p>GEO significa Generative Engine Optimization — a prática de optimizar conteúdo para ser citado por sistemas de IA como os AI Overviews do Google, o ChatGPT, o Perplexity, e o Copilot.</p>
+      <p>A distinção: o SEO tradicional optimiza para que o Google rankeie bem o teu conteúdo. O GEO optimiza para que a IA cite o teu conteúdo nas suas respostas. São objetivos relacionados mas não idênticos.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 15 · SEO vs GEO
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">A distinção</div>
+    <h2>SEO otimiza ranking.<br>GEO otimiza citação.</h2>
+    <div class="sp" style="height:22px"></div>
+    <div class="g2" style="max-width:780px;">
+      <div class="card">
+        <h4>SEO tradicional</h4>
+        <p>Otimiza para que o Google <strong>rankeie</strong> bem o teu conteúdo nos resultados de pesquisa.</p>
+      </div>
+      <div class="card ac">
+        <h4>GEO</h4>
+        <p>Otimiza para que a IA <strong>cite</strong> o teu conteúdo nas suas respostas — Google, ChatGPT, Perplexity, Copilot.</p>
+      </div>
+    </div>
+    <div class="sp" style="height:16px"></div>
+    <p>São objetivos relacionados mas não idênticos, e o segundo <strong>está a ganhar importância</strong> à medida que o zero-click cresce.</p>
+    <div class="snotes" style="display:none;">
+      <p>O SEO tradicional optimiza para que o Google rankeie bem o teu conteúdo. O GEO optimiza para que a IA cite o teu conteúdo nas suas respostas. São objetivos relacionados mas não idênticos, e o segundo está a ganhar importância à medida que o zero-click cresce.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 16 · FATORES DE CITAÇÃO — PARTE 1
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">O que determina citação</div>
+    <h2>5 fatores para<br>ser citado pela IA.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="list">
+      <div class="li"><span class="dot g"></span><span><strong>Completude semântica</strong> — 40% das citações vêm de posições 11-20. Conteúdo completo supera posição.</span></div>
+      <div class="li"><span class="dot g"></span><span><strong>Resposta directa nos primeiros 100 palavras</strong> — 44% das citações vêm da primeira parte. Responde primeiro, explica depois.</span></div>
+      <div class="li"><span class="dot g"></span><span><strong>Frescura</strong> — 85% das citações de conteúdo dos últimos 2 anos. 44% de 2025.</span></div>
+      <div class="li"><span class="dot g"></span><span><strong>E-E-A-T visível</strong> — 96% das citações de fontes com sinais fortes de experiência e autoridade.</span></div>
+      <div class="li"><span class="dot g"></span><span><strong>Velocidade</strong> — páginas &lt; 0.4s têm 3x mais probabilidade de ser citadas.</span></div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Estes fatores vêm de análise empírica de centenas de milhares de queries, não de documentação oficial da Google.</p>
+      <p>76% das URLs citadas nos AI Overviews também rankeiam no top 10, mas 40% vêm de posições 11-20. Um site pode não estar no top 10 mas ainda ser citado se o conteúdo for mais completo.</p>
+      <p>O modelo óptimo citado tem 134-167 palavras por passagem. A IA prefere conteúdo que responde primeiro, explica depois — o oposto do conteúdo que constrói para a resposta.</p>
+      <p>E-E-A-T visível: autor identificado com credenciais reais, fontes citadas, dados originais quando possível.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 17 · PROMPT GEO
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">Demo · Conteúdo para AI Overviews</div>
+    <h2>Brief optimizado<br>para citação.</h2>
+    <div class="sp" style="height:16px"></div>
+    <div class="prompt-box">"Vou criar um artigo optimizado para ser citado nos AI Overviews do Google
+e nas respostas de outros sistemas de IA.
+
+Tema: <strong>[tema específico]</strong>
+Audiência: <strong>[audiência]</strong>
+Keyword principal: <strong>[keyword]</strong>
+
+Cria um brief de conteúdo com:
+1. Parágrafo de abertura de 50-80 palavras — <strong>responde directamente à query</strong>
+2. Estrutura de headers H2/H3 que cobre o tópico completamente
+3. 3 secções em formato Q&amp;A para featured snippets
+4. Uma tabela comparativa sobre um aspecto relevante
+5. Secção "Perguntas frequentes" com 5 perguntas e respostas directas
+
+Evita introduções genéricas. Responde primeiro, contextualiza depois."</div>
+    <div class="snotes" style="display:none;">
+      <p>Este prompt aplica diretamente os fatores de citação: resposta directa no início, cobertura semântica completa, formato Q&amp;A para featured snippets, dados estruturados via tabelas.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 18 · EXERCÍCIO BLOCO 3
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="3">
+    <div class="eyebrow">Exercício · 15 min</div>
+    <h2>Cria um brief,<br>não o artigo.</h2>
+    <div class="sp" style="height:20px"></div>
+    <p>Usa a marca do exercício anterior e escolhe uma keyword do Bloco 1.</p>
+    <div class="sp" style="height:16px"></div>
+    <div class="debate">
+      No final, responde por escrito:<br><br>
+      <strong>1.</strong> O parágrafo de abertura responde directamente à query ou ainda está a construir para a resposta?<br><br>
+      <strong>2.</strong> Há alguma Q&amp;A que parece forçada e que reformularias com base no que sabes da audiência?
+    </div>
+    <div class="sp" style="height:14px"></div>
+    <p style="font-size:13px;">Estas perguntas treinam o <strong>julgamento editorial</strong> sobre conteúdo gerado por IA — identificar o que é mecanicamente correcto mas falta autenticidade.</p>
+    <div class="snotes" style="display:none;">
+      <p>Cada pessoa usa a marca do exercício anterior e escolhe uma keyword do Bloco 1 que queira trabalhar. Não escreve o artigo — cria a estrutura. As duas perguntas finais treinam o julgamento editorial — a capacidade de identificar o que é mecanicamente correcto mas falta autenticidade.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 19 · BLOCO 4 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="4">
+    <div class="eyebrow">Bloco 4 · Estratégia</div>
+    <h1>Análise e<br>estratégia<br>com IA.</h1>
+    <p class="lead" style="text-align:center;">Workshop acelerado<br>15 minutos</p>
+    <div class="snotes" style="display:none;">
+      <p>Este bloco é deliberadamente mais curto porque é onde se juntam as peças dos blocos anteriores. Não há nova teoria — há um workflow de estratégia completo feito em tempo real.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 20 · WORKFLOW DE ESTRATÉGIA
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="4">
+    <div class="eyebrow">Workshop · Plano de 30 dias</div>
+    <h2>Junta as peças.</h2>
+    <div class="sp" style="height:16px"></div>
+    <div class="prompt-box">"Sou responsável pelo SEO de <strong>[marca/site]</strong>.
+Com base no seguinte contexto:
+- Keyword principal: <strong>[keyword do bloco 1]</strong>
+- Problemas técnicos encontrados: <strong>[2-3 problemas do bloco 2]</strong>
+- Tipo de conteúdo a criar: <strong>[brief do bloco 3]</strong>
+
+Cria um plano de acção de SEO com 30 dias:
+- <strong>Semana 1:</strong> Quick wins técnicos
+- <strong>Semana 2-3:</strong> Criação e optimização de conteúdo
+- <strong>Semana 4:</strong> Link building e autoridade
+- Métricas a monitorizar
+
+Para cada acção, indica prioridade alta/média/baixa
+e estimativa realista de esforço em horas."</div>
+    <div class="snotes" style="display:none;">
+      <p>Este prompt usa a keyword research e a auditoria dos blocos anteriores como input. É o workflow de análise competitiva completo — feito em 10 minutos. O objetivo é mostrar como os blocos anteriores se encaixam num plano de acção real.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 21 · ESTRUTURA DO PLANO
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="4">
+    <div class="eyebrow">O plano de 30 dias</div>
+    <h2>De diagnóstico<br>a acção.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="g2" style="max-width:820px;">
+      <div class="card ac">
+        <div class="tag pur">Semana 1</div>
+        <h4>Quick wins técnicos</h4>
+        <p>O que impacta mais rápido — schema markup, Core Web Vitals, meta tags, problemas críticos identificados na auditoria.</p>
+      </div>
+      <div class="card">
+        <div class="tag grn">Semana 2-3</div>
+        <h4>Conteúdo e optimização</h4>
+        <p>Criar e publicar conteúdo optimizado para AI Overviews. Aplicar o brief do Bloco 3. Estrutura Q&amp;A e tabelas comparativas.</p>
+      </div>
+      <div class="card">
+        <div class="tag org">Semana 4</div>
+        <h4>Autoridade e links</h4>
+        <p>Link building estratégico, E-E-A-T visível, sinais de autoridade que os sistemas de IA privilegiam nas citações.</p>
+      </div>
+      <div class="card">
+        <div class="tag pur">Métricas</div>
+        <h4>O que monitorizar</h4>
+        <p>Posições + citações em AI Overviews + CTR + impressões + Core Web Vitals. <strong>As métricas mudaram com o jogo.</strong></p>
+      </div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>A estrutura do plano segue uma lógica de impacto: primeiro o que é rápido e técnico, depois conteúdo que demora a indexar, por último autoridade que demora a construir. As métricas devem incluir citações em AI Overviews — já não basta monitorizar posições.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 22 · BLOCO 5 — SECTION HEADER
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="5">
+    <div class="eyebrow">Bloco 5 · Fechar</div>
+    <h1>O que levas<br>para amanhã.</h1>
+    <div class="snotes" style="display:none;">
+      <p>Três pontos para sair com — os takeaways essenciais desta aula.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 23 · TRÊS TAKEAWAYS
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="5">
+    <div class="eyebrow">Três pontos</div>
+    <h2>O SEO não morreu.<br>Transformou-se.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="list">
+      <div class="li"><span class="dot"></span><span><strong>A IA comprime o tempo de cada tarefa.</strong> Uma tarde de auditoria → 20 minutos. Dois dias de keyword research → duas horas. Esse tempo ganho é para pensar melhor, não para fazer mais do mesmo.</span></div>
+      <div class="li"><span class="dot"></span><span><strong>O novo objetivo é ser citado, não apenas rankear.</strong> GEO e SEO alimentam-se mutuamente. Conteúdo completo, rápido, com E-E-A-T forte, e estruturado para respostas directas é bom para ambos.</span></div>
+      <div class="li"><span class="dot"></span><span><strong>A ferramenta mais importante é o julgamento.</strong> Keywords que não fazem sentido. Auditorias com problemas já resolvidos. Conteúdo mecanicamente correcto mas sem voz. Saber quando aceitar e quando rejeitar — é o que diferencia.</span></div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>A IA não substitui o SEO — comprime o tempo de cada tarefa. O que antes levava uma tarde de auditoria agora leva 20 minutos. O que antes levava dois dias de keyword research agora leva duas horas. Esse tempo ganho é para pensar melhor, não para fazer mais do mesmo.</p>
+      <p>O novo objetivo é ser citado, não apenas rankear. GEO e SEO não são a mesma coisa, mas alimentam-se mutuamente.</p>
+      <p>A ferramenta mais importante é o julgamento. A IA gera keywords que não fazem sentido para a marca específica. Gera auditorias que identificam problemas que já foram resolvidos. Gera conteúdo que está mecanicamente correcto mas falta a voz e o contexto que só quem conhece o negócio tem.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 24 · FERRAMENTAS
+  ══════════════════════════════════════════ -->
+  <div class="slide" data-b="5">
+    <div class="eyebrow">Referência</div>
+    <h2>Ferramentas.</h2>
+    <div class="sp" style="height:20px"></div>
+    <div class="tools-grid">
+      <div class="card">
+        <h4>Keyword Research</h4>
+        <p><strong>Ahrefs Keyword Generator</strong> — até 150 keywords, difficulty score<br>
+        <strong>Keyword Surfer</strong> — extensão Chrome, volume nos resultados<br>
+        <strong>AnswerSocrates</strong> — perguntas com intent labels<br>
+        <strong>AlsoAsked</strong> — mapa visual de People Also Ask<br>
+        <strong>Search Console</strong> — dados reais do site</p>
+      </div>
+      <div class="card">
+        <h4>Auditoria Técnica</h4>
+        <p><strong>Screaming Frog</strong> — crawler até 500 URLs, gratuito<br>
+        <strong>PageSpeed Insights</strong> — Core Web Vitals<br>
+        <strong>Rich Results Test</strong> — validação de schema<br>
+        <strong>Bing Webmasters</strong> — auditoria + AI citation (beta)</p>
+      </div>
+      <div class="card">
+        <h4>GEO e AI Tracking</h4>
+        <p><strong>Mangools AI Search Grader</strong> — visibilidade em ChatGPT, Mistral, Llama<br>
+        <strong>Ubersuggest</strong> — AI Search Visibility tracking</p>
+      </div>
+      <div class="card">
+        <h4>LLMs para SEO</h4>
+        <p><strong>Claude</strong> — melhor para conteúdo longo, análise de grandes volumes de texto<br>
+        <strong>ChatGPT</strong> — melhor para research em tempo real com browsing, ideação rápida</p>
+      </div>
+    </div>
+    <div class="snotes" style="display:none;">
+      <p>Todas as ferramentas listadas têm versões gratuitas ou free tiers suficientes para começar. A combinação de IA + ferramentas gratuitas cobre o que antes exigia subscripções pagas de Semrush ou Ahrefs premium.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 25 · FECHO
+  ══════════════════════════════════════════ -->
+  <div class="slide center" data-b="5">
+    <div class="eyebrow">Para terminar</div>
+    <h2 style="max-width:700px; font-size:clamp(26px,3.8vw,46px);">
+      O SEO não morreu.<br>Transformou-se.
+    </h2>
+    <div class="sp" style="height:28px"></div>
+    <div class="hl" style="font-size:clamp(14px,1.7vw,18px); max-width:680px; text-align:left;">
+      A IA é simultaneamente a causa dessa transformação<br>e a melhor ferramenta para navegar nela.
+    </div>
+    <div class="sp" style="height:24px"></div>
+    <p style="text-align:center; max-width:600px;">
+      Conteúdo completo, rápido, com E-E-A-T forte, e estruturado para respostas directas.<br><br>
+      <strong>Bom para SEO. Bom para GEO. Bom para o utilizador.</strong>
+    </p>
+    <div class="snotes" style="display:none;">
+      <p>O SEO não morreu — transformou-se. E a IA é simultaneamente a causa dessa transformação e a melhor ferramenta para navegar nela. Conteúdo completo, rápido, com E-E-A-T forte, e estruturado para respostas directas é bom para ambos simultaneamente.</p>
+    </div>
+  </div>
+
+</div><!-- /#deck -->
+
+<!-- notes panel -->
+<div id="notesPanel">
+  <div id="notesPanelHeader">
+    <span>Notas do apresentador</span>
+    <button id="notesPanelClose" onclick="toggleNotes()">fechar ×</button>
+  </div>
+  <div id="notesContent"></div>
+</div>
+
+<!-- nav bar -->
+<nav id="nav">
+  <button class="nbtn" id="btnPrev" onclick="go(-1)" title="← Anterior">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+      <path d="M8.5 10.5L4.5 6.5L8.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <span id="counter">1 / 25</span>
+  <button class="nbtn" id="btnNext" onclick="go(1)" title="→ Seguinte">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+      <path d="M4.5 2.5L8.5 6.5L4.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</nav>
+
+<script>
+  const slides    = Array.from(document.querySelectorAll('#deck .slide'));
+  const total     = slides.length;
+  let   cur       = 0;
+  let   animating = false;
+  let   notesOpen = false;
+
+  function goTo(n) {
+    if (animating || n === cur) return;
+    n = Math.max(0, Math.min(n, total - 1));
+
+    animating = true;
+    slides[cur].classList.add('exit');
+    slides[cur].classList.remove('active');
+
+    const prev = cur;
+    cur = n;
+
+    slides[cur].classList.add('active');
+    slides[cur].classList.remove('exit');
+
+    setTimeout(() => {
+      slides[prev].classList.remove('exit');
+      animating = false;
+    }, 420);
+
+    document.getElementById('counter').textContent = `${cur + 1} / ${total}`;
+    document.getElementById('progress').style.width = `${((cur + 1) / total) * 100}%`;
+
+    const b = slides[cur].dataset.b;
+    document.querySelectorAll('.bpip').forEach(p =>
+      p.classList.toggle('on', p.dataset.b === b)
+    );
+
+    document.getElementById('btnPrev').disabled = cur === 0;
+    document.getElementById('btnNext').disabled = cur === total - 1;
+
+    if (notesOpen) updateNotesContent();
+  }
+
+  function go(dir) { goTo(cur + dir); }
+
+  /* ── Notes ── */
+  function toggleNotes() {
+    notesOpen = !notesOpen;
+    document.getElementById('notesPanel').classList.toggle('open', notesOpen);
+    document.getElementById('notesBtn').classList.toggle('active', notesOpen);
+    if (notesOpen) updateNotesContent();
+  }
+
+  function updateNotesContent() {
+    const notesEl = slides[cur].querySelector('.snotes');
+    const content = document.getElementById('notesContent');
+    if (notesEl && notesEl.innerHTML.trim()) {
+      content.innerHTML = notesEl.innerHTML;
+    } else {
+      content.innerHTML = '<p style="color:var(--muted); font-style:italic;">(sem notas para este slide)</p>';
+    }
+  }
+
+  /* ── Keyboard ── */
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight', 'ArrowDown', ' '].includes(e.key)) { e.preventDefault(); go(1); }
+    if (['ArrowLeft', 'ArrowUp'].includes(e.key))         { e.preventDefault(); go(-1); }
+    if (e.key === 'n' || e.key === 'N')                   { e.preventDefault(); toggleNotes(); }
+    if (e.key === 'Escape' && notesOpen)                  { toggleNotes(); }
+  });
+
+  /* ── Touch / Swipe ── */
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const d = tx - e.changedTouches[0].clientX;
+    if (Math.abs(d) > 48) go(d > 0 ? 1 : -1);
+  });
+
+  /* ── Click slide to advance ── */
+  document.getElementById('deck').addEventListener('click', e => {
+    if (!e.target.closest('#nav') && !e.target.closest('#notesPanel')) go(1);
+  });
+
+  /* ── Init ── */
+  goTo(0);
+  document.getElementById('btnPrev').disabled = true;
+</script>
+</body>
+</html>
