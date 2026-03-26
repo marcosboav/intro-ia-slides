@@ -35,7 +35,8 @@
       margin-bottom: 14px;
     }
     .sub { font-size: clamp(15px, 1.8vw, 20px); font-weight: 300; color: var(--muted); text-align: center; margin-bottom: 56px; }
-    .cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; max-width: 980px; width: 100%; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 980px; width: 100%; }
+    @media (min-width: 900px) { .cards { grid-template-columns: 1fr 1fr; } }
     .card {
       background: #111120; border: 1px solid rgba(255,255,255,0.07);
       border-radius: 16px; padding: 32px 28px;
@@ -74,6 +75,12 @@
       <span class="num">Aula 3</span>
       <h2>IA &amp; SEO.</h2>
       <p>Keywords, auditoria técnica, GEO, AI Overviews, schema markup e estratégia de conteúdo.</p>
+      <span class="arr">→</span>
+    </a>
+    <a class="card" href="aula4.html">
+      <span class="num">Aula 4</span>
+      <h2>Agentes, Agentic &amp; Vibe Coding.</h2>
+      <p>LLM vs. agente vs. agentic, vibe coding e exercício prático no Lovable — da ideia à landing page ao vivo.</p>
       <span class="arr">→</span>
     </a>
   </div>
